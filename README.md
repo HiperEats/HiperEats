@@ -6,9 +6,9 @@
 
 **HiperEats** is a managed e-scooter fleet-as-a-service for food delivery from hypermarket food courts.
 
-A (fictional) hypermarket chain with restaurants and take-away counters contracts a fleet operator to manage and maintain a fleet of electric scooters at its stores. Couriers book a scooter at their store's hub, deliver meals to nearby customers and return it to the hub. The operator manages the vehicle lifecycle and handles maintenance within the agreed SLA. The hypermarket chain, as the institutional client, sets the rules of use and follows business and technical KPIs.
+HiperEats owns a fleet of electric scooters and supplies it as a managed service to a (fictional) hypermarket chain with restaurants and take-away counters. Couriers book a scooter at their store's hub, deliver meals to nearby customers and return it to the hub. HiperEats manages the vehicle lifecycle and handles maintenance within the agreed SLA. The hypermarket chain, as the institutional client, sets the rules of use and follows usage reports and business and technical KPIs.
 
-Vehicle state is driven by telemetry from a separate fleet simulator (battery, position, lock state, faults), and deposits and overtime charges go through a payment sandbox.
+Vehicle state is driven by telemetry from a separate fleet simulator (battery, position, lock state, faults), and payments go through Stripe in test mode.
 
 This is the group project of the Software Testing and Quality (TQS) course, University of Aveiro, 2026/27.
 
@@ -26,7 +26,7 @@ Every member is also a developer.
 
 | Resource | Link |
 |---|---|
-| Jira backlog | _TBD_ |
+| Jira backlog | [HiperEats backlog](https://hipereats.atlassian.net/jira/software/projects/HE/boards/2/backlog) |
 | API documentation (Swagger UI) | _TBD_ |
 | Static analysis dashboard | _TBD_ |
 | Observability dashboard | _TBD_ |
