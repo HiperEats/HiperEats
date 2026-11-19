@@ -1,0 +1,32 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #1f2328;
+  background: #ffffff;
+}
+
+main {
+  max-width: 40rem;
+  margin: 4rem auto;
+  padding: 0 1rem;
+}
+
+.status {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+}
+
+.status-checking {
+  background: #eaeef2;
+}
+
+.status-up {
+  background: #dafbe1;
+  color: #116329;
+}
+
+.status-down {
+  background: #ffebe9;
+  color: #a40e26;
+}
