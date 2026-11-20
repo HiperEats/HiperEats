@@ -32,13 +32,25 @@ Every member is also a developer.
 | Observability dashboard | _TBD_ |
 | Deployed application | _TBD_ |
 
+## Architecture
+
+The backend is one deployable built with ports and adapters: the domain and services never call the fleet simulator, Stripe or the database directly, only through their ports.
+
+**Logical view:** modules, ports and adapters, and the external systems they reach.
+
+![HiperEats logical view](docs/architecture/logical-view.png)
+
+**Deployment view:** the containers run with Docker Compose on one host.
+
+![HiperEats deployment view](docs/architecture/deployment-view.png)
+
 ## Repository structure
 
 ```
 backend/      Spring Boot (Java 21) platform
 frontend/     web UI (React)
 simulator/    fleet telemetry simulator (own container)
-docs/         Product Specification report, QA Manual, presentation (PDF)
+docs/         Product Specification report, QA Manual, presentation (PDF), architecture diagrams
 .github/      CI workflows, pull request template, Dependabot
 AGENTS.md     instructions for AI agents
 CONTRIBUTING.md  code style, workflow and review checklist
