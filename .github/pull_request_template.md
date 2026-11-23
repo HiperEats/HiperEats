@@ -15,7 +15,13 @@ HE-<n>: <story title>
 
 ## AI use
 
-<!-- Which parts were produced or reviewed by AI (tool and model)? List the AI review findings you accepted and rejected, and why. Write "None" if no AI was used. -->
+**Produced with AI:** <!-- Which parts were produced by AI (tool and model)? Write "None" if no AI was used. -->
+
+**Claude review findings:** <!-- The Claude review workflow comments on this pull request. List each finding and what you did with it. Write "None" if it found nothing. -->
+
+| Finding | Accepted or rejected | Why |
+|---|---|---|
+| | | |
 
 ## Checklist
 
