@@ -62,6 +62,8 @@ pt.ua.hipereats/
 - **Rule parameters are configuration, not constants.** Minimum battery, maximum use duration, booking hold time, peak windows and SLA deadlines come from the client's rules of use or application configuration. Take the values from the Product Specification; never guess them.
 - **Time:** inject a `java.time.Clock`; never call `now()` directly in domain or application code. Boundary tests depend on it. Time zone `Europe/Lisbon`.
 - **Money:** `BigDecimal`, never `double`.
+- **Database schema:** PostgreSQL 18, created only by Flyway migrations in `backend/src/main/resources/db/migration`. Hibernate validates the entities against the schema (`ddl-auto=validate`) and never changes it. Each story adds the tables it needs in a **new** migration; a migration already on `main` is never edited. Name new migrations with a timestamp so that parallel branches do not collide: `V<yyyyMMddHHmm>__<what_it_does>.sql`, for example `V202611241030__create_stores_and_scooters.sql`.
+- **Integration tests that start the whole application** (`@SpringBootTest`) import `PostgresTestcontainersConfiguration`, which runs a real PostgreSQL 18 in Docker. Never use an embedded database (H2) instead.
 - **Do not invent business rules.** If a story needs a rule the specification does not define, ask, or state the assumption in the pull request.
 
 ## 5. REST API conventions
@@ -130,7 +132,10 @@ Frontend (in `frontend/`, Node 22):
 
 Whole stack (repository root):
 
-- `docker compose up --build`: web UI on `localhost:3000`, backend on `localhost:8080`, MQTT broker on `localhost:1883`
-- `docker compose down`: stop it
+- First time only: `cp .env.example .env` and set your own `POSTGRES_PASSWORD` in `.env` (never committed)
+- `docker compose up --build`: web UI on `localhost:3000`, backend on `localhost:8080`, PostgreSQL on `localhost:5432`, MQTT broker on `localhost:1883`
+- `docker compose down`: stop it (the database data stays in the `db-data` volume; `docker compose down -v` erases it)
+
+Backend alone with `./mvnw spring-boot:run` needs a database: start it with `docker compose up -d db` and pass the password from `.env` as `DB_PASSWORD`. Integration tests (`./mvnw verify`) need Docker running, because Testcontainers starts PostgreSQL.
 
 Run the tests of every part you changed before opening a pull request.
