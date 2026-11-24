@@ -13,18 +13,20 @@ HiperEats is the TQS 2026/27 group project (University of Aveiro): a light-mobil
 - **HiperEats (operator and technicians)** manages the scooter lifecycle and does maintenance within an SLA.
 - **The chain (client)** sets the rules of use (the same for every store), follows usage reports and business KPIs, and pays HiperEats a monthly plan priced by number of scooters and included km. Every km above the allowance is charged per km.
 - **Overtime charges are paid by the chain** through Stripe in test mode. There is no deposit per use; a scooter damaged by negligence or missing is charged to the chain at its contract value (BR11). Couriers never pay.
-- **Out of scope:** food ordering (orders come from a simulated generator: delivery address and time only), end customers, issuing invoices to the chain, real vehicles and real payments, native mobile apps.
+- **Out of scope:** food ordering (orders come from a simulated generator: delivery address and time only), end customers, issuing invoices to the chain, real vehicles and real payments, native mobile apps. The extensions (geofencing and predictive maintenance) stay out until the team decides to do them.
 
 Roles in the system: `COURIER`, `TECHNICIAN`, `OPERATOR`, `CHAIN_MANAGER`, `ADMIN`.
 
 `README.md` has the short version of the concept and the project links. The full specification (personas, user stories, business rules with their IDs, SLOs, architecture) is the Product Specification report in `docs/`. When the code and the specification disagree, raise it in the pull request; do not silently pick one.
 
+The meeting minutes in `docs/Minutes/` record why and when the team decided something. They are dated: a later decision replaces an earlier one. Only what they list as decided is a decision; proposals and open questions are not. When the minutes and the specification disagree, ask a human.
+
 ## 2. Repository layout
 
-- `backend/`: Spring Boot, Java 21, Maven
+- `backend/`: Spring Boot, Java 21, Maven, with PostgreSQL 18 as the database (being added in HE-45)
 - `frontend/`: web UI in React
-- `simulator/`: fleet telemetry simulator, own container; talks to the backend only through the telemetry integration interface (MQTT)
-- `docs/`: reports in PDF (Product Specification, QA Manual)
+- `simulator/`: fleet telemetry simulator and order generator, own container (planned in HE-50); talks to the backend only through the telemetry integration interface (MQTT)
+- `docs/`: reports in PDF (Product Specification, QA Manual), architecture diagrams and the meeting minutes (`docs/Minutes/`)
 - `.github/`: CI workflows, pull request template, Dependabot
 
 ## 3. Architecture rules (backend)
@@ -80,6 +82,8 @@ pt.ua.hipereats/
 
 - MQTT topic per scooter: `hipereats/scooters/{scooterCode}/telemetry`.
 - JSON message: `scooterCode`, `timestamp`, `batteryPercent`, `latitude`, `longitude`, `locked`, `fault` (null when none).
+- The simulator also answers the unlock command of BR12, sent by the backend on one outbound topic per scooter. The topic names and messages of the unlock command and its acknowledgement are not defined yet (HE-50, HE-51); do not assume them.
+- The simulator and order generator values (Product Specification, 4.3) are configurable through environment variables, so that load tests can raise the rate.
 - The contract is documented and tested on both sides, so another simulator can replace ours.
 
 ## 7. Testing rules
@@ -87,7 +91,7 @@ pt.ua.hipereats/
 - **Every change comes with tests.** Business rules get unit tests that cover their boundary values (for example, for BR1 and a delivery at 3 km: a range of 7.2 km accepted, 7.1 km refused).
 - **Test first (TDD) is a team rule, mandatory at least for the business rules (BR).** Write the test, see it fail for the expected reason, then write the code. The failing tests are committed before the code, in a separate commit.
 - **Unit tests** are named `*Test` and run with Surefire; **integration tests** are named `*IT` and run with Failsafe, separately **(proposal)**.
-- **Integration tests** cover persistence, the adapters (telemetry, payments) and the REST API. They use Testcontainers for the database and the MQTT broker. Tests never call the real Stripe API in CI; use a simulated Stripe.
+- **Integration tests** cover persistence, the adapters (telemetry, payments) and the REST API. They use Testcontainers for the database (PostgreSQL 18, the same engine as production) and the MQTT broker (Mosquitto). Tests never call the real Stripe API in CI; use a simulated Stripe.
 - **Acceptance tests:** Gherkin features with Cucumber, tagged with the rule they cover (`@BR1`) and the story key (`@HE-12`).
 - **Traceability:** link JUnit tests to their Jira story with `@Requirement("HE-12")` from `xray-junit-extensions`, so CI results reach Xray.
 - **End-to-end tests** (Playwright) do not run on every build. Load tests (k6) check the SLO thresholds.

@@ -9,6 +9,7 @@ Guidelines for every contributor, human or agent: how to run the project, how a 
 | Product concept, team and project links | [README.md](README.md) |
 | User stories, sprint and their state | [Jira backlog](https://hipereats.atlassian.net/jira/software/projects/HE/boards/2/backlog) |
 | User stories, business rules (`BR<n>`), lifecycles, SLOs and API | [Product Specification](docs/HiperEats%20-%20Product%20Specification%20report.pdf) |
+| Team decisions, by meeting | [Meeting minutes](docs/Minutes); a later decision replaces an earlier one |
 | Package layout, domain, REST, telemetry and testing rules | [AGENTS.md](AGENTS.md); they apply to humans too |
 | Gherkin scenarios | [backend/src/test/resources/features](backend/src/test/resources/features) |
 | CI pipeline | [.github/workflows/ci.yml](.github/workflows/ci.yml) |
@@ -65,7 +66,7 @@ Reports: `backend/target/surefire-reports/` (unit), `backend/target/failsafe-rep
 
 We follow GitHub flow: `main` is always deployable and protected, and every change reaches it through a pull request.
 
-1. Pick a story from the current sprint in Jira and move it to **In Progress**.
+1. Pick a story or task from the current sprint in Jira (see [Stories](#stories)) and move it to **In Progress**.
 2. Create a branch from an up-to-date `main`, named after the story key: `HE-<n>-short-description` (for example `HE-12-booking-endpoint`).
 
    ```bash
@@ -81,6 +82,13 @@ We follow GitHub flow: `main` is always deployable and protected, and every chan
 8. At least one other member approves and CI passes. The author merges and moves the story to **Done**.
 
 Agents never merge. A human approves every pull request.
+
+### Stories
+
+- Write stories in English as `As a <role>, I want to <action>, so that <benefit>`.
+- Keep few acceptance criteria: only those that delimit the story.
+- Each epic is one general theme of the scope; split an epic that grows too broad.
+- Work of the *Platform and quality* epic is created as Tasks, not stories. Tasks follow the same branch and pull request workflow.
 
 ### Merge rules
 
@@ -109,7 +117,7 @@ Agents never merge. A human approves every pull request.
   void whenBatteryBelowRequiredRange_thenBookingIsRefused() { ... }
   ```
 
-- Unit tests for business logic, with the boundary values of each rule; integration tests (Testcontainers, adapters, REST API) run separately from unit tests.
+- Unit tests for business logic, with the boundary values of each rule; integration tests (adapters, REST API, and Testcontainers with PostgreSQL 18 and Mosquitto) run separately from unit tests.
 - Acceptance criteria of core stories are Gherkin scenarios automated with Cucumber, tagged with the story (`@HE-29`) and the business rule they cover (for example `@BR1`).
 - Scenarios of stories not implemented yet are tagged `@wip` and left out of the build. When you implement a story, write its steps in `backend/src/test/java/pt/ua/hipereats/acceptance` and remove `@wip` from its feature file.
 - Tests are linked to their Jira story so that Xray reports coverage: the story tag in Gherkin, and `@Requirement` in JUnit once `xray-junit-extensions` is in `backend/pom.xml`.
