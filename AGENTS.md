@@ -62,7 +62,7 @@ pt.ua.hipereats/
   - inactive to retired: operator retires the scooter; `RETIRED` is final
 
   Any other transition is an error. A fault reported while the scooter is in use is recorded and handled when the use ends.
-- **Business rules** have IDs (`BR<n>`) in the Product Specification. Refer to them by ID in code comments only where it helps, and always in test names or tags.
+- **Business rules** have IDs (`BR<n>`) in the Product Specification. Refer to them by ID in code comments only where it helps, and always in the tests: `@DisplayName` in JUnit, tags in Gherkin.
 - **Rule parameters are configuration, not constants.** The chain manager changes only the reservation validity (BR5) and the low-battery alert level (BR8), for all stores at once. Every other value is fixed and comes from application configuration: range margin, delivery radius, maximum use duration, grace period, overtime fee, peak windows, SLA times, plan km and price per extra km. Take the values from the Product Specification; never guess them.
 - **Time:** inject a `java.time.Clock`; never call `now()` directly in domain or application code. Boundary tests depend on it. Time zone `Europe/Lisbon`.
 - **Money:** `BigDecimal`, never `double`.
@@ -91,7 +91,9 @@ pt.ua.hipereats/
 - **Acceptance tests:** Gherkin features with Cucumber, tagged with the rule they cover (`@BR1`) and the story key (`@HE-12`).
 - **Traceability:** link JUnit tests to their Jira story with `@Requirement("HE-12")` from `xray-junit-extensions`, so CI results reach Xray.
 - **End-to-end tests** (Playwright) do not run on every build. Load tests (k6) check the SLO thresholds.
-- Test names follow `whenX_thenY`: `whenBatteryBelowRequiredRange_thenBookingIsRefused`. Use AssertJ for assertions; mock only ports, not domain classes.
+- Test names follow `whenX_thenY`: `whenBatteryBelowRequiredRange_thenBookingIsRefused`. They state the situation and the observable result, not the method called.
+- Tests of a business rule also have a `@DisplayName` that starts with the rule ID: `@DisplayName("BR1: booking refused below the required range")`.
+- Each test follows Arrange, Act, Assert and checks one behaviour. Use AssertJ for assertions; mock only ports, not domain classes.
 - **Never weaken, skip or delete existing tests, or loosen quality gate settings, to make a build pass.**
 
 ## 8. Frontend

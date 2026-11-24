@@ -101,6 +101,14 @@ Agents never merge. A human approves every pull request.
 ## Tests
 
 - **Test first (TDD):** write the test, see it fail for the expected reason, then write the code. Commit the failing tests before the code, in a separate commit. Only the last commit of the pull request has to pass CI. [HE-45](https://github.com/HiperEats/HiperEats/pull/8/commits) is an example: first `HE-45 Add failing tests for the PostgreSQL persistence base`, then `HE-45 Add PostgreSQL, JPA and Flyway with the persistence base`.
+- Name tests `whenX_thenY`: the situation and the observable result, not the method called. Tests of a business rule also have a `@DisplayName` that starts with the rule ID. Each test follows Arrange, Act, Assert and checks one behaviour.
+
+  ```java
+  @Test
+  @DisplayName("BR1: booking refused below the required range")
+  void whenBatteryBelowRequiredRange_thenBookingIsRefused() { ... }
+  ```
+
 - Unit tests for business logic, with the boundary values of each rule; integration tests (Testcontainers, adapters, REST API) run separately from unit tests.
 - Acceptance criteria of core stories are Gherkin scenarios automated with Cucumber, tagged with the story (`@HE-29`) and the business rule they cover (for example `@BR1`).
 - Scenarios of stories not implemented yet are tagged `@wip` and left out of the build. When you implement a story, write its steps in `backend/src/test/java/pt/ua/hipereats/acceptance` and remove `@wip` from its feature file.
