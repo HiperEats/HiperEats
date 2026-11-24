@@ -73,7 +73,7 @@ We follow GitHub flow: `main` is always deployable and protected, and every chan
    git switch --no-track -c HE-12-booking-endpoint origin/main
    ```
 
-3. Write the tests first, see them fail and commit them; then write the code and commit it separately (see [Tests](#tests)).
+3. Write the tests first, see them fail and commit them; then write the code and commit it separately. This is mandatory at least for the business rules (see [Tests](#tests)).
 4. Start every commit message with the story key: `HE-12 add booking endpoint`.
 5. Run the tests and push: `git push -u origin HE-12-booking-endpoint`.
 6. Open a pull request to `main` whose title starts with the story key (`HE-12 Add booking endpoint`), fill in the template and move the story to **In Review**. One story per pull request.
@@ -85,14 +85,14 @@ Agents never merge. A human approves every pull request.
 ### Merge rules
 
 - GitHub blocks direct pushes to `main`, and blocks the merge until another member has approved and every review conversation is resolved. A new push cancels the approvals already given.
-- GitHub does not block on a failing CI yet, but the team does: never merge with CI failing. The SonarCloud quality gate joins this rule when it is in place (HE-40).
+- GitHub does not block on a failing CI yet, but the team does: never merge with CI failing. The quality gate joins this rule when it is in place (HE-40): SonarCloud with JaCoCo and the *Sonar way* gate on new code (at least 80% coverage, at most 3% duplication, A ratings, security hotspots reviewed), required to merge to `main`. A dependency check in CI on every build is also decided and not in place yet (HE-47).
 - Choose **Create a merge commit**. Squash would join the failing tests and the code in one commit, and the history would no longer show that the tests came first.
 - GitHub deletes the branch after the merge.
 
 ## Code style
 
 - **Java:** [Google Java Style Guide](https://google.github.io/styleguide/javaguide.html). Four-space indentation is accepted to match IDE defaults.
-- Names in English. Classes are nouns, methods are verbs, tests follow `whenX_thenY` (`whenBatteryBelowRequiredRange_thenBookingIsRefused`).
+- Everything in the repository is in English: code, comments, commits, pull requests and documents. Classes are nouns, methods are verbs, tests follow `whenX_thenY` (`whenBatteryBelowRequiredRange_thenBookingIsRefused`).
 - Business rules live in the domain/service layer, never in controllers or adapters. The package layout is in [AGENTS.md, section 3](AGENTS.md#3-architecture-rules-backend).
 - External systems (telemetry simulator, payment gateway) are reached only through a port interface and its adapter.
 - No secrets in the repository. Configuration comes from environment variables or GitHub Secrets.
@@ -100,7 +100,7 @@ Agents never merge. A human approves every pull request.
 
 ## Tests
 
-- **Test first (TDD):** write the test, see it fail for the expected reason, then write the code. Commit the failing tests before the code, in a separate commit. Only the last commit of the pull request has to pass CI. [HE-45](https://github.com/HiperEats/HiperEats/pull/8/commits) is an example: first `HE-45 Add failing tests for the PostgreSQL persistence base`, then `HE-45 Add PostgreSQL, JPA and Flyway with the persistence base`.
+- **Test first (TDD)**, mandatory at least for the business rules (BR): write the test, see it fail for the expected reason, then write the code. Commit the failing tests before the code, in a separate commit. Only the last commit of the pull request has to pass CI. [HE-45](https://github.com/HiperEats/HiperEats/pull/8/commits) is an example: first `HE-45 Add failing tests for the PostgreSQL persistence base`, then `HE-45 Add PostgreSQL, JPA and Flyway with the persistence base`.
 - Name tests `whenX_thenY`: the situation and the observable result, not the method called. Tests of a business rule also have a `@DisplayName` that starts with the rule ID. Each test follows Arrange, Act, Assert and checks one behaviour.
 
   ```java
@@ -129,7 +129,7 @@ AI tools are welcome; the responsibility stays with the person who opens the pul
 A story is done when:
 
 - its acceptance criteria are met and automated;
-- the tests were written first (TDD): the failing tests were committed before the code, in a separate commit;
+- at least for the business rules (BR), the tests were written first (TDD): the failing tests were committed before the code, in a separate commit;
 - the required unit and integration tests are written and pass;
 - CI is green and the SonarCloud quality gate (HE-40) passes on new code;
 - the pull request was approved by another member;

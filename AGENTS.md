@@ -85,7 +85,7 @@ pt.ua.hipereats/
 ## 7. Testing rules
 
 - **Every change comes with tests.** Business rules get unit tests that cover their boundary values (for example, for BR1 and a delivery at 3 km: a range of 7.2 km accepted, 7.1 km refused).
-- **Test first (TDD) is a team rule.** Write the test, see it fail for the expected reason, then write the code. The failing tests are committed before the code, in a separate commit.
+- **Test first (TDD) is a team rule, mandatory at least for the business rules (BR).** Write the test, see it fail for the expected reason, then write the code. The failing tests are committed before the code, in a separate commit.
 - **Unit tests** are named `*Test` and run with Surefire; **integration tests** are named `*IT` and run with Failsafe, separately **(proposal)**.
 - **Integration tests** cover persistence, the adapters (telemetry, payments) and the REST API. They use Testcontainers for the database and the MQTT broker. Tests never call the real Stripe API in CI; use a simulated Stripe.
 - **Acceptance tests:** Gherkin features with Cucumber, tagged with the rule they cover (`@BR1`) and the story key (`@HE-12`).
