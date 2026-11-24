@@ -15,7 +15,7 @@ HiperEats is the TQS 2026/27 group project (University of Aveiro): a light-mobil
 - **Overtime charges are paid by the chain** through Stripe in test mode. There is no deposit per use; a scooter damaged by negligence or missing is charged to the chain at its contract value (BR11). Couriers never pay.
 - **Out of scope:** food ordering (orders come from a simulated generator: delivery address and time only), end customers, issuing invoices to the chain, real vehicles and real payments, native mobile apps.
 
-Roles in the system: `COURIER`, `OPERATOR` (includes technicians), `CHAIN_MANAGER`, `ADMIN`.
+Roles in the system: `COURIER`, `TECHNICIAN`, `OPERATOR`, `CHAIN_MANAGER`, `ADMIN`.
 
 `README.md` has the short version of the concept and the project links. The full specification (personas, user stories, business rules with their IDs, SLOs, architecture) is the Product Specification report in `docs/`. When the code and the specification disagree, raise it in the pull request; do not silently pick one.
 
@@ -48,25 +48,29 @@ pt.ua.hipereats/
 
 ## 4. Domain rules
 
-- **Scooter states:** `AVAILABLE`, `RESERVED`, `IN_USE`, `MAINTENANCE`, `RETIRED`. Allowed transitions:
-  - available to reserved: booking
-  - reserved to available: booking expired or cancelled
-  - reserved to in use: use starts
-  - in use to available: use ends at its own store
-  - available or in use to maintenance: fault reported by telemetry
-  - maintenance to available: ticket closed
-  - maintenance or available to retired: operator decision
+- **Scooter states:** `INACTIVE`, `AVAILABLE`, `RESERVED`, `IN_USE`, `MAINTENANCE`, `RETIRED`. A new scooter starts `INACTIVE` when the operator registers it at a store (BR13). Allowed transitions (Product Specification, 3.3):
+  - inactive to available: operator activates the scooter
+  - available to reserved: courier reserves the scooter (BR1 to BR4)
+  - available to in use: courier starts a use immediately and the platform unlocks the scooter (BR1 to BR4, BR12)
+  - reserved to in use: use starts and the platform unlocks the scooter (BR5, BR12)
+  - reserved to available: reservation cancelled or expired (BR5)
+  - in use to available: scooter locked at its own store and use ended (BR6, BR7, BR12)
+  - in use to maintenance: use ended with low battery, with a fault, or with a problem reported by the courier (BR8)
+  - available to maintenance: fault reported by telemetry, or sent by the operator (BR8, BR9)
+  - maintenance to available: ticket closed by the technician (BR11)
+  - available or maintenance to inactive: operator deactivates the scooter
+  - inactive to retired: operator retires the scooter; `RETIRED` is final
 
-  Any other transition is an error.
+  Any other transition is an error. A fault reported while the scooter is in use is recorded and handled when the use ends.
 - **Business rules** have IDs (`BR<n>`) in the Product Specification. Refer to them by ID in code comments only where it helps, and always in test names or tags.
-- **Rule parameters are configuration, not constants.** Minimum battery, maximum use duration, booking hold time, peak windows and SLA deadlines come from the client's rules of use or application configuration. Take the values from the Product Specification; never guess them.
+- **Rule parameters are configuration, not constants.** The chain manager changes only the reservation validity (BR5) and the low-battery alert level (BR8), for all stores at once. Every other value is fixed and comes from application configuration: range margin, delivery radius, maximum use duration, grace period, overtime fee, peak windows, SLA times, plan km and price per extra km. Take the values from the Product Specification; never guess them.
 - **Time:** inject a `java.time.Clock`; never call `now()` directly in domain or application code. Boundary tests depend on it. Time zone `Europe/Lisbon`.
 - **Money:** `BigDecimal`, never `double`.
 - **Do not invent business rules.** If a story needs a rule the specification does not define, ask, or state the assumption in the pull request.
 
 ## 5. REST API conventions
 
-- Resources, not actions, all under `/api`: `/stores`, `/scooters`, `/bookings`, `/tickets`, `/rules`, `/reports/usage`, `/reports/platform`, `/users`, `/payments`.
+- Resources, not actions, all under `/api/v1`: `/stores`, `/scooters`, `/bookings`, `/maintenance-tickets`, `/charges`, `/rules`, `/reports/usage`, `/reports/performance`, `/users`. Ending a use is an update of the booking, not a separate action endpoint.
 - Plural nouns, `camelCase` JSON fields, ISO-8601 timestamps with offset.
 - Status codes **(proposal)**: `201` with `Location` on creation, `400` invalid input, `401` not authenticated, `403` wrong role, `404` not found, `409` state conflict (scooter already taken), `422` business rule violated. Error bodies use Spring's `ProblemDetail`, naming the rule when one applies (for example `BR1`).
 - Role checks happen in the backend on every endpoint, not only in the UI.
@@ -80,19 +84,20 @@ pt.ua.hipereats/
 
 ## 7. Testing rules
 
-- **Every change comes with tests.** Business rules get unit tests that cover their boundary values (for example, for a minimum battery level: one point below the minimum refused, the minimum itself accepted).
+- **Every change comes with tests.** Business rules get unit tests that cover their boundary values (for example, for BR1 and a delivery at 3 km: a range of 7.2 km accepted, 7.1 km refused).
+- **Test first (TDD) is a team rule.** Write the test, see it fail for the expected reason, then write the code. The failing tests are committed before the code, in a separate commit.
 - **Unit tests** are named `*Test` and run with Surefire; **integration tests** are named `*IT` and run with Failsafe, separately **(proposal)**.
 - **Integration tests** cover persistence, the adapters (telemetry, payments) and the REST API. They use Testcontainers for the database and the MQTT broker. Tests never call the real Stripe API in CI; use a simulated Stripe.
 - **Acceptance tests:** Gherkin features with Cucumber, tagged with the rule they cover (`@BR1`) and the story key (`@HE-12`).
 - **Traceability:** link JUnit tests to their Jira story with `@Requirement("HE-12")` from `xray-junit-extensions`, so CI results reach Xray.
 - **End-to-end tests** (Playwright) do not run on every build. Load tests (k6) check the SLO thresholds.
-- Test names describe behaviour: `bookingIsRefusedWhenBatteryBelowMinimum`. Use AssertJ for assertions; mock only ports, not domain classes.
+- Test names follow `whenX_thenY`: `whenBatteryBelowRequiredRange_thenBookingIsRefused`. Use AssertJ for assertions; mock only ports, not domain classes.
 - **Never weaken, skip or delete existing tests, or loosen quality gate settings, to make a build pass.**
 
 ## 8. Frontend
 
 - React with Vite (JavaScript, JSX). Lint with oxlint (`.oxlintrc.json`); unit tests with Vitest and React Testing Library, next to the component (`App.test.jsx`).
-- In development, Vite forwards `/api` to the backend on `localhost:8080`; in Docker, nginx does the same. Always call the API with relative paths (`/api/...`).
+- In development, Vite forwards `/api` to the backend on `localhost:8080`; in Docker, nginx does the same. Always call the API with relative paths (`/api/v1/...`).
 - One web UI with views per role; the backend is the source of truth for permissions.
 - Use semantic HTML and labelled form fields (accessibility checks are a valued practice). Add `data-testid` attributes where Playwright needs stable selectors.
 
