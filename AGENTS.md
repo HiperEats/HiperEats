@@ -68,7 +68,7 @@ pt.ua.hipereats/
 - **Rule parameters are configuration, not constants.** The chain manager changes only the reservation validity (BR5) and the low-battery alert level (BR8), for all stores at once. Every other value is fixed and comes from application configuration: range margin, delivery radius, maximum use duration, grace period, overtime fee, peak windows, SLA times, plan km and price per extra km. Take the values from the Product Specification; never guess them.
 - **Time:** inject a `java.time.Clock`; never call `now()` directly in domain or application code. Boundary tests depend on it. Time zone `Europe/Lisbon`.
 - **Money:** `BigDecimal`, never `double`.
-- **Database schema:** PostgreSQL 18, created only by Flyway migrations in `backend/src/main/resources/db/migration`. Hibernate validates the entities against the schema (`ddl-auto=validate`) and never changes it. Each story adds the tables it needs in a **new** migration; a migration already on `main` is never edited. Name new migrations with a timestamp so that parallel branches do not collide: `V<yyyyMMddHHmm>__<what_it_does>.sql`, for example `V202611241030__create_stores_and_scooters.sql`. A branch merged later can bring a migration older than the last one applied, so Flyway runs with `spring.flyway.out-of-order=true`: it applies the missing one instead of refusing to start.
+- **Database schema:** PostgreSQL 18, created only by Flyway migrations in `backend/src/main/resources/db/migration`. Hibernate validates the entities against the schema (`ddl-auto=validate`) and never changes it. Each story adds the tables it needs in a **new** migration; a migration already merged into `dev` is never edited. Name new migrations with a timestamp so that parallel branches do not collide: `V<yyyyMMddHHmm>__<what_it_does>.sql`, for example `V202611241030__create_stores_and_scooters.sql`. A branch merged later can bring a migration older than the last one applied, so Flyway runs with `spring.flyway.out-of-order=true`: it applies the missing one instead of refusing to start.
 - **Integration tests that start the whole application** are annotated with `@IntegrationTest` (in `backend/src/test/java/pt/ua/hipereats`): the backend on a random port, a `RestTestClient` and a real PostgreSQL 18 in Testcontainers. Every `*IT` and the Cucumber configuration use it, so `./mvnw verify` starts one application context and one PostgreSQL. Do not add another `@SpringBootTest` configuration, and never use an embedded database (H2).
 - **Do not invent business rules.** If a story needs a rule the specification does not define, ask, or state the assumption in the pull request.
 
@@ -117,8 +117,8 @@ pt.ua.hipereats/
 ## 10. Git and pull requests
 
 - Follow `CONTRIBUTING.md` for code style, branch names and commit messages: branch `HE-<n>-short-description`, commits starting with the story key.
-- Work on a feature branch and propose every change as a pull request: one story per pull request, small changes.
-- Never push to `main` and never merge. A human reviews and approves every pull request.
+- Work on a feature branch created from `dev` and propose every change as a pull request to `dev`: one story per pull request, small changes. Only `dev` goes to `main`, also through a pull request.
+- Never push to `dev` or `main` and never merge. A human reviews and approves every pull request.
 - Fill in the pull request template, including the **AI use** section: what was produced by an agent, and which AI review findings were accepted or rejected.
 
 ## 11. Definition of done
