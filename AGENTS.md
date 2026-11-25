@@ -68,8 +68,8 @@ pt.ua.hipereats/
 - **Rule parameters are configuration, not constants.** The chain manager changes only the reservation validity (BR5) and the low-battery alert level (BR8), for all stores at once. Every other value is fixed and comes from application configuration: range margin, delivery radius, maximum use duration, grace period, overtime fee, peak windows, SLA times, plan km and price per extra km. Take the values from the Product Specification; never guess them.
 - **Time:** inject a `java.time.Clock`; never call `now()` directly in domain or application code. Boundary tests depend on it. Time zone `Europe/Lisbon`.
 - **Money:** `BigDecimal`, never `double`.
-- **Database schema:** PostgreSQL 18, created only by Flyway migrations in `backend/src/main/resources/db/migration`. Hibernate validates the entities against the schema (`ddl-auto=validate`) and never changes it. Each story adds the tables it needs in a **new** migration; a migration already on `main` is never edited. Name new migrations with a timestamp so that parallel branches do not collide: `V<yyyyMMddHHmm>__<what_it_does>.sql`, for example `V202611241030__create_stores_and_scooters.sql`.
-- **Integration tests that start the whole application** (`@SpringBootTest`) import `PostgresTestcontainersConfiguration`, which runs a real PostgreSQL 18 in Docker. Never use an embedded database (H2) instead.
+- **Database schema:** PostgreSQL 18, created only by Flyway migrations in `backend/src/main/resources/db/migration`. Hibernate validates the entities against the schema (`ddl-auto=validate`) and never changes it. Each story adds the tables it needs in a **new** migration; a migration already on `main` is never edited. Name new migrations with a timestamp so that parallel branches do not collide: `V<yyyyMMddHHmm>__<what_it_does>.sql`, for example `V202611241030__create_stores_and_scooters.sql`. A branch merged later can bring a migration older than the last one applied, so Flyway runs with `spring.flyway.out-of-order=true`: it applies the missing one instead of refusing to start.
+- **Integration tests that start the whole application** are annotated with `@IntegrationTest` (in `backend/src/test/java/pt/ua/hipereats`): the backend on a random port, a `RestTestClient` and a real PostgreSQL 18 in Testcontainers. Every `*IT` and the Cucumber configuration use it, so `./mvnw verify` starts one application context and one PostgreSQL. Do not add another `@SpringBootTest` configuration, and never use an embedded database (H2).
 - **Do not invent business rules.** If a story needs a rule the specification does not define, ask, or state the assumption in the pull request.
 
 ## 5. REST API conventions
@@ -143,10 +143,10 @@ Frontend (in `frontend/`, Node 22):
 
 Whole stack (repository root):
 
-- First time only: `cp .env.example .env` and set your own `POSTGRES_PASSWORD` in `.env` (never committed)
+- First time only: `cp .env.example .env` and set your own `POSTGRES_PASSWORD` in `.env` (never committed). Every `docker compose` command needs it, even for a service that does not use the database, so that the database never starts without a password.
 - `docker compose up --build`: web UI on `localhost:3000`, backend on `localhost:8080`, PostgreSQL on `localhost:5432`, MQTT broker on `localhost:1883`
 - `docker compose down`: stop it (the database data stays in the `db-data` volume; `docker compose down -v` erases it)
 
-Backend alone with `./mvnw spring-boot:run` needs a database: start it with `docker compose up -d db` and pass the password from `.env` as `DB_PASSWORD`. Integration tests (`./mvnw verify`) need Docker running, because Testcontainers starts PostgreSQL.
+Backend alone with `./mvnw spring-boot:run` needs a database: start it with `docker compose up -d db` and pass the values of `.env` as `DB_URL`, `DB_USER` and `DB_PASSWORD` (the command is in `CONTRIBUTING.md`). The password is stored in the `db-data` volume the first time the database starts: after changing `POSTGRES_PASSWORD` (or `POSTGRES_USER`, `POSTGRES_DB`), run `docker compose down -v`, which erases the local data. Integration tests (`./mvnw verify`) need Docker running, because Testcontainers starts PostgreSQL.
 
 Run the tests of every part you changed before opening a pull request.

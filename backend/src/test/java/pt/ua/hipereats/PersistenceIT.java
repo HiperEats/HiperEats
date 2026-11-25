@@ -9,15 +9,12 @@ import java.sql.Statement;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 
 /**
  * The persistence base (HE-45): the application runs on PostgreSQL 18 and Flyway creates the
  * schema when the application starts.
  */
-@SpringBootTest
-@Import(PostgresTestcontainersConfiguration.class)
+@IntegrationTest
 class PersistenceIT {
 
     @Autowired
