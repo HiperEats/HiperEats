@@ -102,9 +102,28 @@ Agents never merge. A human approves every pull request.
 ### Merge rules
 
 - GitHub blocks direct pushes to `main`, and blocks the merge until another member has approved and every review conversation is resolved. A new push cancels the approvals already given.
-- GitHub does not block on a failing CI yet, but the team does: never merge with CI failing. The quality gate joins this rule when it is in place (HE-40): SonarCloud with JaCoCo and the *Sonar way* gate on new code (at least 80% coverage, at most 3% duplication, A ratings, security hotspots reviewed), required to merge to `main`. A dependency check in CI on every build is also decided and not in place yet (HE-47).
+- GitHub does not block on a failing CI yet, but the team does: never merge with CI failing. The quality gate joins this rule when it is in place (HE-40): SonarCloud with JaCoCo and the *Sonar way* gate on new code (at least 80% coverage, at most 3% duplication, A ratings, security hotspots reviewed), required to merge to `main`. CI also checks the dependencies on every build (Trivy, HE-47); see [When the dependency check fails](#when-the-dependency-check-fails).
 - Choose **Create a merge commit**. Squash would join the failing tests and the code in one commit, and the history would no longer show that the tests came first.
 - GitHub deletes the branch after the merge.
+
+### When the dependency check fails
+
+The *Dependencies (vulnerability scan)* job fails when a dependency has a HIGH or CRITICAL vulnerability **that already has a fixed version**. Vulnerabilities with no fix yet are listed in the job log but do not fail it. A new vulnerability can be published at any time, so the job can fail on a pull request that did not touch any dependency.
+
+1. Read the job log: it names the package, the vulnerability and the fixed version.
+2. Update that dependency to the fixed version, in its own pull request, so that the other pull requests turn green again after it is merged. If Dependabot already opened a pull request for it, review and merge that one.
+3. Only if the fix exists only in a version the team cannot adopt yet (for example a new major), add the vulnerability to `.trivyignore` at the repository root, with the reason and an expiry date, and say so in the pull request:
+
+   ```
+   # Fixed only in Spring Boot 5; revisit when we move to it (HE-<n>)
+   CVE-YYYY-NNNNN exp:2026-12-31
+   ```
+
+   After the expiry date the entry no longer applies and the job fails again, so the exception is reviewed instead of forgotten.
+
+What the job covers: the Maven dependencies (compile and runtime scopes) of the backend and the simulator, and every npm dependency of the frontend, development dependencies included. It does not scan Maven test dependencies: Dependabot opens pull requests to update them, and its alerts report their known vulnerabilities. Dependabot alerts and Dependabot security updates must stay on in the repository settings (Advanced Security).
+
+The base images of the Dockerfiles and of `docker-compose.yml` are not scanned. Most of their tags name only a major version (`postgres:18`, `node:22-alpine`, `eclipse-temurin:21-jre`), so Dependabot proposes no update for them, because new majors are ignored on purpose. Those tags still receive the patched builds of their major: rebuild with `docker compose build --pull` and `docker compose pull` to get them.
 
 ## Code style
 
