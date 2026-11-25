@@ -29,8 +29,7 @@ public class SimulatorConfiguration {
 
     @Bean
     MqttGateway mqttGateway(SimulatorProperties properties, JsonMapper json) throws MqttException {
-        return new MqttGateway(properties.mqtt().brokerUrl(), properties.mqtt().clientId(),
-                properties.mqtt().reconnectInterval(), json);
+        return new MqttGateway(properties.mqtt(), json);
     }
 
     @Bean

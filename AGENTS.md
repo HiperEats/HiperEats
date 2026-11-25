@@ -82,9 +82,9 @@ pt.ua.hipereats/
 
 - MQTT topic per scooter: `hipereats/scooters/{scooterCode}/telemetry`.
 - JSON message: `scooterCode`, `timestamp`, `batteryPercent`, `latitude`, `longitude`, `locked`, `fault` (null when none).
-- `timestamp` is ISO-8601 with offset and milliseconds; `batteryPercent` is an integer from 0 to 100.
+- `timestamp` is ISO-8601 with offset and 3 decimals (milliseconds); `batteryPercent` is an integer from 0 to 100.
 - Unlock command of BR12, backend to simulator: topic `hipereats/scooters/{scooterCode}/commands`, QoS 1, message `commandId`, `type` (`UNLOCK`), `sentAt`. `commandId` is required and identifies the command per scooter.
-- Acknowledgement, simulator to backend: topic `hipereats/scooters/{scooterCode}/acks`, QoS 1, message `commandId`, `scooterCode`, `type`, `acknowledgedAt`. A command without id, for an unknown scooter or of an unknown type gets no acknowledgement. When no acknowledgement arrives, the backend resends the command with the **same** `commandId`; the simulator acknowledges it again without starting a second trip.
+- Acknowledgement, simulator to backend: topic `hipereats/scooters/{scooterCode}/acks`, QoS 1, message `commandId`, `scooterCode`, `type`, `acknowledgedAt`. A command without id, for an unknown scooter, of an unknown type or for a parked scooter that reports 0 % gets no acknowledgement. When no acknowledgement arrives, the backend resends the command with the **same** `commandId`; the simulator acknowledges it again without starting a second trip.
 - `simulator/README.md` has the full contract with examples.
 - The simulator and order generator values (Product Specification, 4.3) are configurable through environment variables, so that load tests can raise the rate.
 - The contract is documented and tested on both sides, so another simulator can replace ours.
@@ -133,6 +133,11 @@ Backend (in `backend/`, Java 21):
 - `./mvnw test`: unit tests (`*Test`, Surefire)
 - `./mvnw verify`: unit and integration tests (`*IT`, Failsafe) and packaging
 - `./mvnw spring-boot:run`: run on `localhost:8080`
+
+Simulator (in `simulator/`, Java 21):
+
+- `./mvnw test`: unit tests (`*Test`, Surefire)
+- `./mvnw verify`: unit and integration tests (`*IT`, Failsafe, needs Docker) and packaging
 
 Frontend (in `frontend/`, Node 22):
 

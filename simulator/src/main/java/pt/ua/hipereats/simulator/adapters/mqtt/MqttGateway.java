@@ -1,9 +1,9 @@
 package pt.ua.hipereats.simulator.adapters.mqtt;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallbackExtended;
@@ -14,6 +14,7 @@ import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import pt.ua.hipereats.simulator.SimulatorProperties.Mqtt;
 import pt.ua.hipereats.simulator.application.CommandAck;
 import pt.ua.hipereats.simulator.application.FleetPublisher;
 import pt.ua.hipereats.simulator.application.ScooterCommand;
@@ -33,17 +34,19 @@ public class MqttGateway implements FleetPublisher, AutoCloseable {
     private static final int COMMAND_QOS = 1;
 
     private final MqttClient client;
-    private final Duration reconnectInterval;
+    private final Mqtt properties;
     private final JsonMapper json;
     // Paho must not publish from inside its own callback (it can deadlock), so commands are handled here.
-    private final ExecutorService commandExecutor = Executors.newSingleThreadExecutor();
+    // A failed subscription is tried again here too.
+    private final ScheduledThreadPoolExecutor commandExecutor = new ScheduledThreadPoolExecutor(1);
+    private volatile boolean subscribed;
 
-    /** @param reconnectInterval longest wait between reconnection attempts after the connection drops */
-    public MqttGateway(String brokerUrl, String clientId, Duration reconnectInterval, JsonMapper json)
-            throws MqttException {
-        this.client = new MqttClient(brokerUrl, clientId, new MemoryPersistence());
-        this.reconnectInterval = reconnectInterval;
+    public MqttGateway(Mqtt properties, JsonMapper json) throws MqttException {
+        this.client = new MqttClient(properties.brokerUrl(), properties.clientId(), new MemoryPersistence());
+        this.properties = properties;
         this.json = json;
+        // After close(), a pending attempt to subscribe is dropped.
+        commandExecutor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
     }
 
     /** Connects to the broker and passes every command received to {@code commandHandler(scooterCode, command)}. */
@@ -52,12 +55,7 @@ public class MqttGateway implements FleetPublisher, AutoCloseable {
             @Override
             public void connectComplete(boolean reconnect, String serverUri) {
                 // Also called after an automatic reconnect: the clean session lost the subscription.
-                try {
-                    client.subscribe(MqttTopics.ALL_COMMANDS, COMMAND_QOS);
-                    log.info("Connected to {}, listening on {}", serverUri, MqttTopics.ALL_COMMANDS);
-                } catch (MqttException e) {
-                    log.error("Could not subscribe to {}", MqttTopics.ALL_COMMANDS, e);
-                }
+                subscribe();
             }
 
             @Override
@@ -65,7 +63,10 @@ public class MqttGateway implements FleetPublisher, AutoCloseable {
                 String scooterCode = MqttTopics.scooterCodeOf(topic);
                 try {
                     ScooterCommand command = json.readValue(message.getPayload(), ScooterCommand.class);
-                    commandExecutor.execute(() -> commandHandler.accept(scooterCode, command));
+                    if (command == null) {
+                        throw new IllegalArgumentException("the payload is null");
+                    }
+                    commandExecutor.execute(() -> handle(commandHandler, scooterCode, command));
                 } catch (RuntimeException e) {
                     log.warn("Invalid command on {} ignored: {}", topic,
                             new String(message.getPayload(), StandardCharsets.UTF_8));
@@ -74,6 +75,7 @@ public class MqttGateway implements FleetPublisher, AutoCloseable {
 
             @Override
             public void connectionLost(Throwable cause) {
+                subscribed = false;
                 log.warn("Connection to the broker lost, reconnecting: {}", cause.getMessage());
             }
 
@@ -84,9 +86,44 @@ public class MqttGateway implements FleetPublisher, AutoCloseable {
         });
         MqttConnectOptions options = new MqttConnectOptions();
         options.setAutomaticReconnect(true);
-        options.setMaxReconnectDelay((int) reconnectInterval.toMillis());
+        options.setMaxReconnectDelay(properties.maxReconnectDelayMillis());
         options.setCleanSession(true);
         client.connect(options);
+    }
+
+    private void subscribe() {
+        if (!client.isConnected()) {
+            return; // connectComplete subscribes when the connection is back
+        }
+        try {
+            client.subscribe(MqttTopics.ALL_COMMANDS, COMMAND_QOS);
+            subscribed = true;
+            log.info("Connected to {}, listening on {}", client.getServerURI(), MqttTopics.ALL_COMMANDS);
+        } catch (MqttException e) {
+            // Connected but not subscribed would mean no commands at all: keep trying.
+            log.error("Could not subscribe to {}, retrying in {}", MqttTopics.ALL_COMMANDS,
+                    properties.reconnectInterval(), e);
+            try {
+                commandExecutor.schedule(this::subscribe, properties.reconnectInterval().toMillis(),
+                        TimeUnit.MILLISECONDS);
+            } catch (RejectedExecutionException closed) {
+                // close() was called meanwhile: no more attempts.
+            }
+        }
+    }
+
+    private static void handle(BiConsumer<String, ScooterCommand> commandHandler, String scooterCode,
+                               ScooterCommand command) {
+        try {
+            commandHandler.accept(scooterCode, command);
+        } catch (RuntimeException e) {
+            log.error("Command {} for {} failed", command.commandId(), scooterCode, e);
+        }
+    }
+
+    /** Whether the gateway is connected and subscribed, so it receives commands. */
+    public boolean isSubscribed() {
+        return subscribed && client.isConnected();
     }
 
     @Override

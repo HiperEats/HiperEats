@@ -53,11 +53,28 @@ public record SimulatorProperties(
      * @param reconnectInterval longest wait between reconnection attempts after the connection drops
      */
     public record Mqtt(String brokerUrl, String clientId, Duration reconnectInterval) {
+
+        private static final int PAHO_FIRST_DELAY_MILLIS = 1_000;
+        private static final int PAHO_LONGEST_DELAY_MILLIS = 128_000;
+
         public Mqtt {
             require(brokerUrl != null && !brokerUrl.isBlank(), "simulator.mqtt.broker-url is required");
             require(clientId != null && !clientId.isBlank(), "simulator.mqtt.client-id is required");
             require(reconnectInterval != null && reconnectInterval.isPositive(),
                     "simulator.mqtt.reconnect-interval must be positive");
+        }
+
+        /**
+         * The maximum reconnect delay to give Paho, so that it never waits longer than
+         * {@code reconnectInterval} (1 s at least, its first wait). Paho doubles the wait while it is below
+         * the maximum, so a maximum of 5 s would wait 8 s: the largest of 1, 2, 4, ... 128 s that fits is used.
+         */
+        public int maxReconnectDelayMillis() {
+            int delay = PAHO_FIRST_DELAY_MILLIS;
+            while (delay < PAHO_LONGEST_DELAY_MILLIS && delay * 2L <= reconnectInterval.toMillis()) {
+                delay *= 2;
+            }
+            return delay;
         }
     }
 
@@ -82,14 +99,17 @@ public record SimulatorProperties(
         }
     }
 
-    /** A store and its fleet. */
-    public record StoreProperties(String code, String name, double latitude, double longitude,
-                                  int standardScooters, int longRangeScooters) {
+    /** A store and its fleet. Boxed types, so a missing field is detected instead of becoming 0. */
+    public record StoreProperties(String code, String name, Double latitude, Double longitude,
+                                  Integer standardScooters, Integer longRangeScooters) {
         public StoreProperties {
             require(code != null && !code.isBlank(), "every store needs a code (give every field of every store)");
             require(name != null && !name.isBlank(), "store " + code + " needs a name");
+            require(latitude != null && longitude != null, "store " + code + " needs latitude and longitude");
             require(latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180,
                     "store " + code + " has invalid coordinates");
+            require(standardScooters != null && longRangeScooters != null,
+                    "store " + code + " needs its number of standard and long-range scooters");
             require(standardScooters >= 0 && longRangeScooters >= 0,
                     "store " + code + " cannot have a negative number of scooters");
         }

@@ -10,7 +10,8 @@ simulator:
   mqtt:
     broker-url: tcp://localhost:1883
     client-id: hipereats-simulator
-    # Longest wait between reconnection attempts after the connection drops.
+    # Longest wait between reconnection attempts after the connection drops (1 s at least), and wait
+    # before a failed subscription is tried again.
     reconnect-interval: 5s
   # One reading per scooter every 5 s: 30 scooters give 6 readings/s, below the 10/s of SLO2.
   telemetry-interval: 5s

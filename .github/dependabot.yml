@@ -1,7 +1,9 @@
 version: 2
 updates:
+  # Pull requests go to dev, as every other change (without target-branch they go to main).
   - package-ecosystem: "github-actions"
     directory: "/"
+    target-branch: "dev"
     schedule:
       interval: "weekly"
 
@@ -13,6 +15,7 @@ updates:
 
   - package-ecosystem: "maven"
     directory: "/simulator"
+    target-branch: "dev"
     schedule:
       interval: "weekly"
 

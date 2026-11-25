@@ -84,18 +84,23 @@ public class TripPlanner {
                 return km;
             }
         }
-        return random.nextDouble(MIN_KM, maxKm);
+        return between(MIN_KM, maxKm);
     }
 
     /** The distance of one order, as the order generator would produce it (may be refused by BR2). */
     double deliveryDistanceKm() {
         double band = random.nextDouble();
         if (band < nearShare) {
-            return random.nextDouble(MIN_KM, standardMaxKm);
+            return between(MIN_KM, standardMaxKm);
         }
         if (band < nearShare + middleShare) {
-            return random.nextDouble(standardMaxKm, longRangeMaxKm);
+            return between(standardMaxKm, longRangeMaxKm);
         }
-        return random.nextDouble(longRangeMaxKm, longRangeMaxKm + FAR_EXTRA_KM);
+        return between(longRangeMaxKm, longRangeMaxKm + FAR_EXTRA_KM);
+    }
+
+    /** A random value of the band, or {@code min} when the configured limits leave the band empty. */
+    private double between(double min, double max) {
+        return min < max ? random.nextDouble(min, max) : min;
     }
 }

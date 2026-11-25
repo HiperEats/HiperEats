@@ -4,10 +4,10 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -24,6 +24,13 @@ import pt.ua.hipereats.simulator.domain.SimulatedScooter;
 public class FleetSimulator {
 
     private static final Logger log = LoggerFactory.getLogger(FleetSimulator.class);
+
+    /**
+     * ISO-8601 with offset and always 3 decimals: with an interval below 1 s, readings of the same
+     * second must stay in order, and the ISO formatter would drop trailing zeros.
+     */
+    private static final DateTimeFormatter TIMESTAMP =
+            DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSSXXX", Locale.ROOT);
 
     private final Map<String, SimulatedScooter> fleet = new LinkedHashMap<>();
     /** Commands already handled, as "scooterCode/commandId": an id only identifies a command per scooter. */
@@ -52,7 +59,7 @@ public class FleetSimulator {
             publisher.publishTelemetry(new TelemetryMessage(
                     scooter.code(),
                     now,
-                    (int) Math.floor(scooter.batteryPercent()),
+                    scooter.reportedBatteryPercent(),
                     scooter.position().latitude(),
                     scooter.position().longitude(),
                     scooter.locked(),
@@ -61,10 +68,10 @@ public class FleetSimulator {
     }
 
     /**
-     * Handles a command sent to one scooter. Unknown scooters, command types and commands without
-     * id are ignored (no acknowledgement, so the platform can time out). The same command received
-     * twice by the same scooter is acknowledged again but starts no second trip, because MQTT may
-     * deliver a message twice.
+     * Handles a command sent to one scooter. Unknown scooters, command types, commands without id and
+     * commands to a parked scooter that reports 0 % are ignored (no acknowledgement, so the platform
+     * can time out). The same command received twice by the same scooter is acknowledged again but
+     * starts no second trip, because MQTT may deliver a message twice.
      */
     public synchronized void handleCommand(String scooterCode, ScooterCommand command) {
         SimulatedScooter scooter = fleet.get(scooterCode);
@@ -81,8 +88,16 @@ public class FleetSimulator {
             log.warn("Command without commandId for {} ignored", scooterCode);
             return;
         }
-        if (handledCommands.add(scooterCode + "/" + command.commandId())) {
+        String handledCommand = scooterCode + "/" + command.commandId();
+        if (!handledCommands.contains(handledCommand)) {
+            if (!scooter.onTrip() && scooter.reportedBatteryPercent() == 0) {
+                // Not enough for a trip: it would be locked again before its next reading.
+                log.warn("Unlock {} for {} ignored: empty battery", command.commandId(), scooterCode);
+                return;
+            }
             boolean started = scooter.unlock(tripPlanner.plan(scooter));
+            // Only now: if the unlock fails, the same command sent again must not be acknowledged.
+            handledCommands.add(handledCommand);
             log.info("Unlock {} for {}: {}", command.commandId(), scooterCode,
                     started ? "trip started" : "already on a trip");
         }
@@ -94,7 +109,6 @@ public class FleetSimulator {
     }
 
     private String now() {
-        // Milliseconds: with an interval below 1 s, readings of the same second must stay in order.
-        return OffsetDateTime.now(clock).truncatedTo(ChronoUnit.MILLIS).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+        return OffsetDateTime.now(clock).format(TIMESTAMP);
     }
 }

@@ -46,13 +46,15 @@ To work on one part without rebuilding the containers, run the backend and the f
 
 ## Run the tests
 
-Run the tests of every part you changed before opening a pull request. CI runs `./mvnw verify` and all the frontend commands.
+Run the tests of every part you changed before opening a pull request. CI runs `./mvnw verify` (backend and simulator) and all the frontend commands.
 
 | Directory | Command | What it runs |
 |---|---|---|
 | `backend/` | `./mvnw test` | unit tests (`*Test`) |
 | `backend/` | `./mvnw verify` | unit, integration (`*IT`) and Cucumber acceptance tests |
 | `backend/` | `./mvnw test -Dtest=StatusControllerTest` | one unit test class |
+| `simulator/` | `./mvnw test` | unit tests (`*Test`) |
+| `simulator/` | `./mvnw verify` | unit and integration (`*IT`) tests, with Mosquitto in Docker |
 | `frontend/` | `npm ci` | installs the dependencies, needed before the commands below |
 | `frontend/` | `npm run lint` | lint (oxlint) |
 | `frontend/` | `npm test` | unit tests (Vitest) |

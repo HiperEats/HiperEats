@@ -61,6 +61,11 @@ public final class SimulatedScooter {
         }
     }
 
+    /** Battery level as the scooter reports it: an integer, rounded down. */
+    public int reportedBatteryPercent() {
+        return (int) Math.floor(batteryPercent);
+    }
+
     /** Kilometres the battery still allows: at 100 % the full range of the type (BR1: 25 km or 50 km). */
     public double estimatedRangeKm() {
         return batteryPercent / batteryUsePerKm;

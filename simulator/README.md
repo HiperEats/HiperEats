@@ -29,7 +29,8 @@ of every store (`SIMULATOR_STORES_0_CODE`, `SIMULATOR_STORES_0_NAME`, `SIMULATOR
 setting only `SIMULATOR_STORES_0_STANDARDSCOOTERS` is refused.
 
 Assumptions not in the specification: initial battery between 20 % and 100 %; deliveries from
-0.2 km; orders beyond the 3 km radius reach up to 3.5 km. For now a parked scooter does not charge
+0.2 km; orders beyond the 3 km radius reach up to 3.5 km; a scooter that reports 0 % does not answer
+an unlock. For now a parked scooter does not charge
 and a fault stays until the simulator restarts; this must change before the maintenance stories
 of iteration 3 (for example a service command, or charging while parked).
 
@@ -44,22 +45,23 @@ of iteration 3 (for example a service command, or charging while parked).
 Telemetry (fields as in `AGENTS.md`):
 
 ```json
-{"scooterCode":"AV-01","timestamp":"2026-11-25T19:40:05Z","batteryPercent":76,
+{"scooterCode":"AV-01","timestamp":"2026-11-25T19:40:05.123Z","batteryPercent":76,
  "latitude":40.6405,"longitude":-8.6538,"locked":true,"fault":null}
 ```
 
-`timestamp` has milliseconds (`2026-11-25T19:40:05.123Z`), so readings less than 1 s apart stay in order.
+`timestamp` and `acknowledgedAt` always have 3 decimals (milliseconds), so readings less than 1 s apart
+stay in order.
 `batteryPercent` is an integer (rounded down); `fault` is `null`, `BRAKE_FAULT`, `MOTOR_FAULT` or `BATTERY_FAULT`.
 
 Unlock command and its acknowledgement:
 
 ```json
 {"commandId":"c0ffee-1","type":"UNLOCK","sentAt":"2026-11-25T19:40:00Z"}
-{"commandId":"c0ffee-1","scooterCode":"AV-01","type":"UNLOCK","acknowledgedAt":"2026-11-25T19:40:00Z"}
+{"commandId":"c0ffee-1","scooterCode":"AV-01","type":"UNLOCK","acknowledgedAt":"2026-11-25T19:40:00.250Z"}
 ```
 
-`commandId` is required. A command without it, for an unknown scooter or of an unknown type gets
-no acknowledgement. The same `commandId` received twice by the same scooter is acknowledged again but
+`commandId` is required. A command without it, for an unknown scooter, of an unknown type or for a
+parked scooter that reports 0 % gets no acknowledgement. The same `commandId` received twice by the same scooter is acknowledged again but
 starts no second trip (QoS 1 may deliver twice); ids are tracked per scooter.
 
 If the connection drops between the command and its acknowledgement, the acknowledgement is lost
