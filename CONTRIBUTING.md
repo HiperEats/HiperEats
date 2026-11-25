@@ -1,6 +1,6 @@
 # Contributing to HiperEats
 
-Guidelines for every contributor, human or agent: how to run the project, how a story reaches `main` and what we expect from the code. Keep this file consistent with `AGENTS.md` and with the QA Manual, which will explain the rationale (first version planned for Iteration 2, HE-42).
+Guidelines for every contributor, human or agent: how to run the project, how a story reaches `dev` and then `main`, and what we expect from the code. Keep this file consistent with `AGENTS.md` and with the QA Manual, which will explain the rationale (first version planned for Iteration 2, HE-42).
 
 ## Where things are
 
@@ -73,20 +73,22 @@ Reports: `backend/target/surefire-reports/` (unit), `backend/target/failsafe-rep
 
 ## Workflow
 
-We follow GitHub flow: `main` is always deployable and protected, and every change reaches it through a pull request.
+We follow GitHub flow with an integration branch, `dev`. Every change reaches `dev` through a pull request, and `main` receives changes only through a pull request from `dev`. Both branches are protected, and `main` is always deployable.
+
+`dev` goes to `main` at the end of each iteration, with CI passing **(proposal)**.
 
 1. Pick a story or task from the current sprint in Jira (see [Stories](#stories)) and move it to **In Progress**.
-2. Create a branch from an up-to-date `main`, named after the story key: `HE-<n>-short-description` (for example `HE-12-booking-endpoint`).
+2. Create a branch from an up-to-date `dev`, named after the story key: `HE-<n>-short-description` (for example `HE-12-booking-endpoint`).
 
    ```bash
    git fetch origin
-   git switch --no-track -c HE-12-booking-endpoint origin/main
+   git switch --no-track -c HE-12-booking-endpoint origin/dev
    ```
 
 3. Write the tests first, see them fail and commit them; then write the code and commit it separately. This is mandatory at least for the business rules (see [Tests](#tests)).
 4. Start every commit message with the story key: `HE-12 add booking endpoint`.
 5. Run the tests and push: `git push -u origin HE-12-booking-endpoint`.
-6. Open a pull request to `main` whose title starts with the story key (`HE-12 Add booking endpoint`), fill in the template and move the story to **In Review**. One story per pull request.
+6. Open a pull request to `dev` whose title starts with the story key (`HE-12 Add booking endpoint`), fill in the template and move the story to **In Review**. One story per pull request.
 7. Answer the review. CI runs the build and the tests, and Claude reviews the pull request. Record in the template which of its findings you accepted or rejected, and why.
 8. At least one other member approves and CI passes. The author merges and moves the story to **Done**.
 
@@ -101,10 +103,11 @@ Agents never merge. A human approves every pull request.
 
 ### Merge rules
 
-- GitHub blocks direct pushes to `main`, and blocks the merge until another member has approved and every review conversation is resolved. A new push cancels the approvals already given.
-- GitHub does not block on a failing CI yet, but the team does: never merge with CI failing. The quality gate joins this rule when it is in place (HE-40): SonarCloud with JaCoCo and the *Sonar way* gate on new code (at least 80% coverage, at most 3% duplication, A ratings, security hotspots reviewed), required to merge to `main`. A dependency check in CI on every build is also decided and not in place yet (HE-47).
-- Choose **Create a merge commit**. Squash would join the failing tests and the code in one commit, and the history would no longer show that the tests came first.
-- GitHub deletes the branch after the merge.
+- GitHub blocks direct pushes to `dev` and `main`, and blocks the merge until another member has approved and every review conversation is resolved. A new push cancels the approvals already given.
+- GitHub does not block on a failing CI yet, but the team does: never merge with CI failing. The quality gate joins this rule when it is in place (HE-40): SonarCloud with JaCoCo and the *Sonar way* gate on new code (at least 80% coverage, at most 3% duplication, A ratings, security hotspots reviewed), required to merge to `dev` and `main`. A dependency check in CI on every build is also decided and not in place yet (HE-47).
+- GitHub does not check yet that a pull request to `main` comes from `dev`: check the base and the source branch before you approve or merge.
+- Choose **Create a merge commit**, also from `dev` to `main`. Squash would join the failing tests and the code in one commit, and the history would no longer show that the tests came first.
+- GitHub deletes the story branch after the merge. The rules of the repository do not allow deleting `dev` or `main`.
 
 ## Code style
 
@@ -141,7 +144,7 @@ AI tools are welcome; the responsibility stays with the person who opens the pul
 - Give agents [AGENTS.md](AGENTS.md) before they change anything.
 - In the **AI use** section of the pull request, say what was produced with AI, and which Claude review findings you accepted or rejected and why.
 
-## Definition of done (draft)
+## Definition of done
 
 A story is done when:
 

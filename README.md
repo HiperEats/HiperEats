@@ -1,6 +1,6 @@
 # HiperEats
 
-[![CI](https://github.com/HiperEats/HiperEats/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/HiperEats/HiperEats/actions/workflows/ci.yml)
+[![CI](https://github.com/HiperEats/HiperEats/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/HiperEats/HiperEats/actions/workflows/ci.yml)
 <!-- SonarCloud badge goes here once the quality gate is in place -->
 
 ## Project abstract
