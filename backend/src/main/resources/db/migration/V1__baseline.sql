@@ -1,0 +1,3 @@
+-- Baseline of the HiperEats schema (HE-45).
+-- It creates nothing: each story adds the tables it needs in a new migration
+-- (naming rule in AGENTS.md, section 4).
