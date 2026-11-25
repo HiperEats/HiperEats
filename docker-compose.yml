@@ -20,6 +20,17 @@ services:
       backend:
         condition: service_healthy
 
+  # Fleet simulator (HE-50): publishes the telemetry of 30 scooters and answers unlock commands.
+  # Parameters (Product Specification 4.3) can be overridden here, e.g. SIMULATOR_TELEMETRYINTERVAL: 1s
+  simulator:
+    build: ./simulator
+    environment:
+      SIMULATOR_MQTT_BROKERURL: tcp://mosquitto:1883
+    depends_on:
+      - mosquitto
+    # The broker may take a moment to accept connections: retry until it does.
+    restart: on-failure
+
   mosquitto:
     image: eclipse-mosquitto:2
     ports:
