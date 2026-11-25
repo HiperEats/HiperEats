@@ -29,11 +29,15 @@ services:
       DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-hipereats}
       DB_USER: ${POSTGRES_USER:-hipereats}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}
+      # Telemetry adapter (HE-51): broker that carries the scooters' telemetry.
+      HIPEREATS_TELEMETRY_BROKERURL: tcp://mosquitto:1883
     ports:
       - "8080:8080"
     depends_on:
       db:
         condition: service_healthy
+      mosquitto:
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/8080 && printf \"GET /actuator/health HTTP/1.0\\r\\n\\r\\n\" >&3 && grep -q UP <&3'"]
       interval: 10s
