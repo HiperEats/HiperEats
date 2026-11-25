@@ -1,6 +1,7 @@
 package pt.ua.hipereats.simulator.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -12,10 +13,13 @@ import java.util.Random;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import pt.ua.hipereats.simulator.domain.GeoPoint;
 import pt.ua.hipereats.simulator.domain.ScooterType;
 import pt.ua.hipereats.simulator.domain.SimulatedScooter;
 import pt.ua.hipereats.simulator.domain.Store;
+import pt.ua.hipereats.simulator.domain.Trip;
 
 class FleetSimulatorTest {
 
@@ -69,7 +73,7 @@ class FleetSimulatorTest {
         simulator.tick();
 
         TelemetryMessage reading = publisher.telemetry.getFirst();
-        assertThat(reading.timestamp()).isEqualTo("2026-11-25T19:40:00Z");
+        assertThat(reading.timestamp()).isEqualTo("2026-11-25T19:40:00.000Z");
         assertThat(reading.batteryPercent()).isEqualTo(80); // rounded down
         assertThat(reading.latitude()).isEqualTo(40.6405);
         assertThat(reading.longitude()).isEqualTo(-8.6538);
@@ -84,7 +88,7 @@ class FleetSimulatorTest {
 
         assertThat(av01.locked()).isFalse();
         assertThat(publisher.acks).containsExactly(
-                new CommandAck("cmd-1", "AV-01", "UNLOCK", "2026-11-25T19:40:00Z"));
+                new CommandAck("cmd-1", "AV-01", "UNLOCK", "2026-11-25T19:40:00.000Z"));
     }
 
     @Test
@@ -159,5 +163,90 @@ class FleetSimulatorTest {
 
         assertThat(publisher.acks).isEmpty();
         assertThat(av01.locked()).isTrue();
+    }
+
+    @Test
+    @DisplayName("BR12: a command that failed is not acknowledged when it is sent again and fails again")
+    void whenUnlockFails_thenItsIdIsNotTakenAsHandled() {
+        TripPlanner failing = new TripPlanner(new Random(42), 0.60, 0.35, 0.0, 2.0, 3.0, 1.2) {
+            @Override
+            public Trip plan(SimulatedScooter scooter) {
+                throw new IllegalStateException("cannot plan");
+            }
+        };
+        FleetSimulator broken = new FleetSimulator(List.of(av01), failing, publisher, CLOCK,
+                Duration.ofSeconds(5), 20);
+
+        assertThatIllegalStateException().isThrownBy(() -> broken.handleCommand("AV-01", unlock("cmd-1")));
+        assertThatIllegalStateException().isThrownBy(() -> broken.handleCommand("AV-01", unlock("cmd-1")));
+
+        assertThat(publisher.acks).isEmpty();
+        assertThat(av01.locked()).isTrue();
+    }
+
+    private FleetSimulator withBattery(double battery) {
+        SimulatedScooter scooter = new SimulatedScooter("AV-01", ScooterType.STANDARD, STORE, battery, 4);
+        return new FleetSimulator(List.of(scooter), new TripPlanner(new Random(42), 0.60, 0.35, 0.0, 2.0, 3.0, 1.2),
+                publisher, CLOCK, Duration.ofSeconds(5), 20);
+    }
+
+    @ParameterizedTest
+    @DisplayName("BR12: a scooter that reports 0 % does not unlock, so it sends no acknowledgement")
+    @ValueSource(doubles = {0, 0.05, 0.99})
+    void whenBatteryIsEmpty_thenUnlockIsIgnoredWithoutAck(double battery) {
+        FleetSimulator empty = withBattery(battery);
+
+        empty.handleCommand("AV-01", unlock("cmd-1"));
+        empty.tick();
+
+        assertThat(publisher.acks).isEmpty();
+        assertThat(publisher.telemetry).extracting(TelemetryMessage::locked).containsExactly(true);
+    }
+
+    @Test
+    @DisplayName("BR12: with 1 % the scooter unlocks and its next reading shows it")
+    void whenBatteryIsAlmostEmpty_thenAckedAndReadingShowsItUnlocked() {
+        FleetSimulator almostEmpty = withBattery(1);
+
+        almostEmpty.handleCommand("AV-01", unlock("cmd-1"));
+        almostEmpty.tick();
+
+        assertThat(publisher.acks).hasSize(1);
+        assertThat(publisher.telemetry).extracting(TelemetryMessage::locked).containsExactly(false);
+    }
+
+    @Test
+    void whenBatteryEmptiesDuringTheTrip_thenCommandsAreStillAcked() {
+        FleetSimulator almostEmpty = withBattery(1);
+        almostEmpty.handleCommand("AV-01", unlock("cmd-1"));
+        almostEmpty.tick(); // now below 1 %, reported as 0 %, but unlocked
+
+        almostEmpty.handleCommand("AV-01", unlock("cmd-1"));
+        almostEmpty.handleCommand("AV-01", unlock("cmd-2"));
+
+        assertThat(publisher.telemetry.getFirst().batteryPercent()).isZero();
+        assertThat(publisher.acks).extracting(CommandAck::commandId).containsExactly("cmd-1", "cmd-1", "cmd-2");
+    }
+
+    @Test
+    void whenClockHasTrailingZeros_thenTimestampStillHasThreeDecimals() {
+        Clock clock = Clock.fixed(Instant.parse("2026-11-25T19:40:00.370Z"), ZoneId.of("Europe/Lisbon"));
+        FleetSimulator precise = new FleetSimulator(List.of(av01), new TripPlanner(new Random(42), 0.60, 0.35, 0.0,
+                2.0, 3.0, 1.2), publisher, clock, Duration.ofSeconds(5), 20);
+
+        precise.tick();
+
+        assertThat(publisher.telemetry.getFirst().timestamp()).isEqualTo("2026-11-25T19:40:00.370Z");
+    }
+
+    @Test
+    void whenSummerTime_thenTimestampHasTheLisbonOffset() {
+        Clock clock = Clock.fixed(Instant.parse("2026-07-01T10:00:00Z"), ZoneId.of("Europe/Lisbon"));
+        FleetSimulator summer = new FleetSimulator(List.of(av01), new TripPlanner(new Random(42), 0.60, 0.35, 0.0,
+                2.0, 3.0, 1.2), publisher, clock, Duration.ofSeconds(5), 20);
+
+        summer.tick();
+
+        assertThat(publisher.telemetry.getFirst().timestamp()).isEqualTo("2026-07-01T11:00:00.000+01:00");
     }
 }

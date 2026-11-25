@@ -1,8 +1,10 @@
 package pt.ua.hipereats.simulator.adapters.mqtt;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -17,6 +19,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -52,6 +55,9 @@ class MqttSimulatorIT {
         return "tcp://" + MOSQUITTO.getHost() + ":" + MOSQUITTO.getMappedPort(1883);
     }
 
+    @Autowired
+    private MqttGateway gateway;
+
     private final JsonMapper json = JsonMapper.builder().build();
     private MqttClient platform;
 
@@ -60,6 +66,8 @@ class MqttSimulatorIT {
     void connectPlatform() throws MqttException {
         platform = new MqttClient(brokerUrl(), "test-platform-" + UUID.randomUUID(), new MemoryPersistence());
         platform.connect();
+        // The broker drops a command sent before the simulator has subscribed.
+        await().atMost(Duration.ofSeconds(TIMEOUT_SECONDS)).until(gateway::isSubscribed);
     }
 
     @AfterEach

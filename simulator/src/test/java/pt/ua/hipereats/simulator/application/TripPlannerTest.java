@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.within;
 import java.util.Random;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import pt.ua.hipereats.simulator.domain.GeoPoint;
 import pt.ua.hipereats.simulator.domain.ScooterType;
 import pt.ua.hipereats.simulator.domain.SimulatedScooter;
@@ -128,5 +130,17 @@ class TripPlannerTest {
         Trip second = planner(new Random(7), 0.02).plan(standard(100));
 
         assertThat(first.destination()).isEqualTo(second.destination());
+    }
+
+    @ParameterizedTest
+    @DisplayName("BR2, BR14: every limit the configuration accepts gives a trip within it")
+    @CsvSource({"3.0, 3.0", "0.2, 3.0", "0.1, 3.0", "0.2, 0.2", "0.1, 0.1", "0.1, 0.2"})
+    void whenLimitsAreEqualOrTiny_thenTripStaysWithinThem(double standardMaxKm, double longRangeMaxKm) {
+        TripPlanner limited = new TripPlanner(new Random(42), 0.60, 0.35, 0.0, standardMaxKm, longRangeMaxKm, 1.2);
+
+        for (int i = 0; i < 1_000; i++) {
+            assertThat(oneWayKm(limited.plan(standard(100)))).isBetween(0.0, standardMaxKm + KM_TOLERANCE);
+            assertThat(oneWayKm(limited.plan(longRange(100)))).isBetween(0.0, longRangeMaxKm + KM_TOLERANCE);
+        }
     }
 }
