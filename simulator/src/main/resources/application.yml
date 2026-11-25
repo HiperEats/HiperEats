@@ -1,0 +1,61 @@
+# Simulation parameters: Product Specification, 4.3. Every value can be overridden by an
+# environment variable: simulator.telemetry-interval -> SIMULATOR_TELEMETRYINTERVAL, and so on.
+spring:
+  application:
+    name: hipereats-simulator
+  main:
+    web-application-type: none
+
+simulator:
+  mqtt:
+    broker-url: tcp://localhost:1883
+    client-id: hipereats-simulator
+    # Longest wait between reconnection attempts after the connection drops (1 s at least), and wait
+    # before a failed subscription is tried again.
+    reconnect-interval: 5s
+  # One reading per scooter every 5 s: 30 scooters give 6 readings/s, below the 10/s of SLO2.
+  telemetry-interval: 5s
+  # Average speed 20 km/h (legal limit 25 km/h).
+  speed-kmh: 20
+  # Fixed seed: the same fleet and trips on every run, so tests and demos are repeatable.
+  seed: 42
+  # 2 % of the uses report a fault (feeds maintenance and BR9).
+  fault-probability: 0.02
+  # Battery use matches the full range of BR1: standard 25 km, long range 50 km.
+  standard-battery-use-per-km: 4
+  long-range-battery-use-per-km: 2
+  # Battery of each scooter when the simulator starts (assumption: not in the specification).
+  initial-battery-min: 20
+  initial-battery-max: 100
+  # Orders: 60 % within 2 km, 35 % between 2 and 3 km, the other 5 % beyond 3 km. A scooter only
+  # rides the ones the platform would accept: up to 2 km standard (BR14), 3 km long range (BR2),
+  # and a round trip x 1.2 within its range (BR1).
+  delivery:
+    near-share: 0.60
+    middle-share: 0.35
+    standard-max-km: 2
+    long-range-max-km: 3
+    range-margin: 1.2
+  # 3 stores with 10 scooters each, 7 standard and 3 long range (BR13, BR14).
+  # Synthetic stores; the codes must match the scooters registered in the platform.
+  # The list is replaced as a whole: to change it by environment variables, give every field of
+  # every store (SIMULATOR_STORES_0_CODE, SIMULATOR_STORES_0_NAME, ...).
+  stores:
+    - code: AV
+      name: Aveiro
+      latitude: 40.6405
+      longitude: -8.6538
+      standard-scooters: 7
+      long-range-scooters: 3
+    - code: IL
+      name: Ílhavo
+      latitude: 40.6005
+      longitude: -8.6669
+      standard-scooters: 7
+      long-range-scooters: 3
+    - code: AG
+      name: Águeda
+      latitude: 40.5747
+      longitude: -8.4483
+      standard-scooters: 7
+      long-range-scooters: 3
