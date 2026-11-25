@@ -6,13 +6,16 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
- * The persistence base (HE-45): the application runs on PostgreSQL 18 and Flyway creates the
- * schema when the application starts.
+ * The persistence base (HE-45): the application runs on PostgreSQL 18, Flyway creates the schema
+ * when the application starts, and text is sorted with language rules (store names such as
+ * "\u00c1gueda" or "\u00c9vora" must not go to the end of a list).
  */
 @IntegrationTest
 class PersistenceIT {
@@ -35,12 +38,34 @@ class PersistenceIT {
         assertThat(baselineApplied).isEqualTo("t");
     }
 
+    @Test
+    void whenNamesAreSortedInTheDatabase_thenCaseAndAccentsFollowLanguageRules()
+            throws SQLException {
+        List<String> sorted = queryForStrings(
+                "SELECT name FROM (VALUES ('Zebra'), ('\u00c9vora'), ('Aveiro'), ('braga'),"
+                        + " ('\u00c1gueda')) AS t(name) ORDER BY name");
+
+        assertThat(sorted).containsExactly("\u00c1gueda", "Aveiro", "braga", "\u00c9vora", "Zebra");
+    }
+
     private String queryForString(String sql) throws SQLException {
         try (Connection connection = dataSource.getConnection();
                 Statement statement = connection.createStatement();
                 ResultSet result = statement.executeQuery(sql)) {
             assertThat(result.next()).as("query returns a row: %s", sql).isTrue();
             return result.getString(1);
+        }
+    }
+
+    private List<String> queryForStrings(String sql) throws SQLException {
+        try (Connection connection = dataSource.getConnection();
+                Statement statement = connection.createStatement();
+                ResultSet result = statement.executeQuery(sql)) {
+            List<String> values = new ArrayList<>();
+            while (result.next()) {
+                values.add(result.getString(1));
+            }
+            return values;
         }
     }
 }
