@@ -7,6 +7,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import pt.ua.hipereats.domain.telemetry.TelemetryReading;
 import tools.jackson.core.JacksonException;
 
@@ -99,6 +101,23 @@ class TelemetryMessageTest {
         assertThatThrownBy(() -> parse("""
                 {"scooterCode":"AV-01","timestamp":"2026-11-25T19:40:05Z","batteryPercent":76,
                  "latitude":40.6405,"longitude":-8.6538,"locked":1,"fault":null}
+                """)).isInstanceOf(JacksonException.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"123", "1.5", "true"})
+    void whenFaultIsNotText_thenMessageIsRefused(String fault) {
+        assertThatThrownBy(() -> parse("""
+                {"scooterCode":"AV-01","timestamp":"2026-11-25T19:40:05Z","batteryPercent":76,
+                 "latitude":40.6405,"longitude":-8.6538,"locked":true,"fault":%s}
+                """.formatted(fault))).isInstanceOf(JacksonException.class);
+    }
+
+    @Test
+    void whenScooterCodeIsANumber_thenMessageIsRefused() {
+        assertThatThrownBy(() -> parse("""
+                {"scooterCode":1,"timestamp":"2026-11-25T19:40:05Z","batteryPercent":76,
+                 "latitude":40.6405,"longitude":-8.6538,"locked":true,"fault":null}
                 """)).isInstanceOf(JacksonException.class);
     }
 }
