@@ -10,6 +10,8 @@ simulator:
   mqtt:
     broker-url: tcp://localhost:1883
     client-id: hipereats-simulator
+    # Longest wait between reconnection attempts after the connection drops.
+    reconnect-interval: 5s
   # One reading per scooter every 5 s: 30 scooters give 6 readings/s, below the 10/s of SLO2.
   telemetry-interval: 5s
   # Average speed 20 km/h (legal limit 25 km/h).
@@ -24,12 +26,19 @@ simulator:
   # Battery of each scooter when the simulator starts (assumption: not in the specification).
   initial-battery-min: 20
   initial-battery-max: 100
-  # Delivery distances: 60 % within 2 km, 35 % between 2 and 3 km, the other 5 % beyond 3 km.
+  # Orders: 60 % within 2 km, 35 % between 2 and 3 km, the other 5 % beyond 3 km. A scooter only
+  # rides the ones the platform would accept: up to 2 km standard (BR14), 3 km long range (BR2),
+  # and a round trip x 1.2 within its range (BR1).
   delivery:
     near-share: 0.60
     middle-share: 0.35
+    standard-max-km: 2
+    long-range-max-km: 3
+    range-margin: 1.2
   # 3 stores with 10 scooters each, 7 standard and 3 long range (BR13, BR14).
   # Synthetic stores; the codes must match the scooters registered in the platform.
+  # The list is replaced as a whole: to change it by environment variables, give every field of
+  # every store (SIMULATOR_STORES_0_CODE, SIMULATOR_STORES_0_NAME, ...).
   stores:
     - code: AV
       name: Aveiro

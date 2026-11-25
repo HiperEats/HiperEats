@@ -61,6 +61,11 @@ public final class SimulatedScooter {
         }
     }
 
+    /** Kilometres the battery still allows: at 100 % the full range of the type (BR1: 25 km or 50 km). */
+    public double estimatedRangeKm() {
+        return batteryPercent / batteryUsePerKm;
+    }
+
     public boolean onTrip() {
         return trip != null;
     }

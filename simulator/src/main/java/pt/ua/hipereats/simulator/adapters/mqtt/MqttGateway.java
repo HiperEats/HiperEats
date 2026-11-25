@@ -1,6 +1,7 @@
 package pt.ua.hipereats.simulator.adapters.mqtt;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.BiConsumer;
@@ -32,12 +33,16 @@ public class MqttGateway implements FleetPublisher, AutoCloseable {
     private static final int COMMAND_QOS = 1;
 
     private final MqttClient client;
+    private final Duration reconnectInterval;
     private final JsonMapper json;
     // Paho must not publish from inside its own callback (it can deadlock), so commands are handled here.
     private final ExecutorService commandExecutor = Executors.newSingleThreadExecutor();
 
-    public MqttGateway(String brokerUrl, String clientId, JsonMapper json) throws MqttException {
+    /** @param reconnectInterval longest wait between reconnection attempts after the connection drops */
+    public MqttGateway(String brokerUrl, String clientId, Duration reconnectInterval, JsonMapper json)
+            throws MqttException {
         this.client = new MqttClient(brokerUrl, clientId, new MemoryPersistence());
+        this.reconnectInterval = reconnectInterval;
         this.json = json;
     }
 
@@ -79,6 +84,7 @@ public class MqttGateway implements FleetPublisher, AutoCloseable {
         });
         MqttConnectOptions options = new MqttConnectOptions();
         options.setAutomaticReconnect(true);
+        options.setMaxReconnectDelay((int) reconnectInterval.toMillis());
         options.setCleanSession(true);
         client.connect(options);
     }
@@ -95,7 +101,13 @@ public class MqttGateway implements FleetPublisher, AutoCloseable {
 
     private void publish(String topic, Object payload, int qos) {
         if (!client.isConnected()) {
-            log.debug("Not connected, message to {} dropped", topic);
+            if (qos == TELEMETRY_QOS) {
+                // A lost reading is replaced by the next one.
+                log.debug("Not connected, message to {} dropped", topic);
+            } else {
+                // The platform must resend the command with the same commandId to get the ack.
+                log.warn("Not connected, acknowledgement to {} lost: {}", topic, payload);
+            }
             return;
         }
         try {

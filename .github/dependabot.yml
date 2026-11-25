@@ -11,10 +11,10 @@ updates:
   #   schedule:
   #     interval: "weekly"
 
-  # - package-ecosystem: "maven"
-  #   directory: "/simulator"
-  #   schedule:
-  #     interval: "weekly"
+  - package-ecosystem: "maven"
+    directory: "/simulator"
+    schedule:
+      interval: "weekly"
 
   # - package-ecosystem: "npm"
   #   directory: "/frontend"

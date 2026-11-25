@@ -29,7 +29,8 @@ public class SimulatorConfiguration {
 
     @Bean
     MqttGateway mqttGateway(SimulatorProperties properties, JsonMapper json) throws MqttException {
-        return new MqttGateway(properties.mqtt().brokerUrl(), properties.mqtt().clientId(), json);
+        return new MqttGateway(properties.mqtt().brokerUrl(), properties.mqtt().clientId(),
+                properties.mqtt().reconnectInterval(), json);
     }
 
     @Bean
@@ -42,8 +43,10 @@ public class SimulatorConfiguration {
                 .toList();
         FleetFactory factory = new FleetFactory(random, properties.standardBatteryUsePerKm(),
                 properties.longRangeBatteryUsePerKm(), properties.initialBatteryMin(), properties.initialBatteryMax());
-        TripPlanner planner = new TripPlanner(random, properties.delivery().nearShare(),
-                properties.delivery().middleShare(), properties.faultProbability());
+        SimulatorProperties.Delivery delivery = properties.delivery();
+        TripPlanner planner = new TripPlanner(random, delivery.nearShare(), delivery.middleShare(),
+                properties.faultProbability(), delivery.standardMaxKm(), delivery.longRangeMaxKm(),
+                delivery.rangeMargin());
         return new FleetSimulator(factory.create(stores), planner, gateway, clock,
                 properties.telemetryInterval(), properties.speedKmh());
     }

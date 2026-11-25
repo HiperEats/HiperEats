@@ -26,6 +26,7 @@ public class FleetSimulator {
     private static final Logger log = LoggerFactory.getLogger(FleetSimulator.class);
 
     private final Map<String, SimulatedScooter> fleet = new LinkedHashMap<>();
+    /** Commands already handled, as "scooterCode/commandId": an id only identifies a command per scooter. */
     private final Set<String> handledCommands = new HashSet<>();
     private final TripPlanner tripPlanner;
     private final FleetPublisher publisher;
@@ -60,9 +61,10 @@ public class FleetSimulator {
     }
 
     /**
-     * Handles a command sent to one scooter. Unknown scooters and command types are ignored (no
-     * acknowledgement, so the platform can time out). The same command received twice is
-     * acknowledged again but starts no second trip, because MQTT may deliver a message twice.
+     * Handles a command sent to one scooter. Unknown scooters, command types and commands without
+     * id are ignored (no acknowledgement, so the platform can time out). The same command received
+     * twice by the same scooter is acknowledged again but starts no second trip, because MQTT may
+     * deliver a message twice.
      */
     public synchronized void handleCommand(String scooterCode, ScooterCommand command) {
         SimulatedScooter scooter = fleet.get(scooterCode);
@@ -74,8 +76,13 @@ public class FleetSimulator {
             log.warn("Unknown command type {} for {} ignored", command.type(), scooterCode);
             return;
         }
-        if (handledCommands.add(command.commandId())) {
-            boolean started = scooter.unlock(tripPlanner.plan(scooter.store().location()));
+        if (command.commandId() == null || command.commandId().isBlank()) {
+            // Without an id, a repeated command cannot be told from a new one: refuse it.
+            log.warn("Command without commandId for {} ignored", scooterCode);
+            return;
+        }
+        if (handledCommands.add(scooterCode + "/" + command.commandId())) {
+            boolean started = scooter.unlock(tripPlanner.plan(scooter));
             log.info("Unlock {} for {}: {}", command.commandId(), scooterCode,
                     started ? "trip started" : "already on a trip");
         }
@@ -87,6 +94,7 @@ public class FleetSimulator {
     }
 
     private String now() {
-        return OffsetDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+        // Milliseconds: with an interval below 1 s, readings of the same second must stay in order.
+        return OffsetDateTime.now(clock).truncatedTo(ChronoUnit.MILLIS).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
     }
 }
