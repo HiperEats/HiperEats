@@ -14,7 +14,7 @@ class StatusControllerTest {
     private MockMvcTester mvc;
 
     @Test
-    void statusReportsServiceNameAndUp() {
+    void whenStatusRequested_thenServiceNameAndUpAreReturned() {
         assertThat(mvc.get().uri("/api/status"))
                 .hasStatusOk()
                 .bodyJson()
