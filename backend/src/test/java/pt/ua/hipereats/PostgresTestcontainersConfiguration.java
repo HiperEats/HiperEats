@@ -6,7 +6,8 @@ import org.springframework.context.annotation.Bean;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /**
- * A real PostgreSQL 18 for the integration tests, started in Docker by Testcontainers.
+ * A real PostgreSQL 18 for the integration tests, started in Docker by Testcontainers, with the same
+ * image as docker-compose.yml.
  *
  * <p>Tests do not import it directly: they use {@link IntegrationTest}, which imports it. The
  * container is a Spring bean, so
@@ -20,6 +21,7 @@ public class PostgresTestcontainersConfiguration {
     @Bean
     @ServiceConnection
     PostgreSQLContainer postgres() {
-        return new PostgreSQLContainer("postgres:18-alpine");
+        // Same image as docker-compose.yml: Debian, not alpine, so text sorts with language rules.
+        return new PostgreSQLContainer("postgres:18");
     }
 }

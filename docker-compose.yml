@@ -3,7 +3,9 @@
 # Start with: docker compose up --build   then open http://localhost:3000
 services:
   db:
-    image: postgres:18-alpine
+    # Debian image, not alpine: alpine sorts text without language rules, so ORDER BY would put
+    # names such as "Águeda" or lower-case names after "Zebra". Tests use the same image.
+    image: postgres:18
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-hipereats}
       POSTGRES_USER: ${POSTGRES_USER:-hipereats}
