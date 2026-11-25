@@ -25,7 +25,7 @@ The meeting minutes in `docs/Minutes/` record why and when the team decided some
 
 - `backend/`: Spring Boot, Java 21, Maven, with PostgreSQL 18 as the database (being added in HE-45)
 - `frontend/`: web UI in React
-- `simulator/`: fleet telemetry simulator and order generator, own container (planned in HE-50); talks to the backend only through the telemetry integration interface (MQTT)
+- `simulator/`: fleet telemetry simulator and order generator, own container (fleet simulator in HE-50; the order generator is not done yet); talks to the backend only through the telemetry integration interface (MQTT)
 - `docs/`: reports in PDF (Product Specification, QA Manual), architecture diagrams and the meeting minutes (`docs/Minutes/`)
 - `.github/`: CI workflows, pull request template, Dependabot
 
@@ -82,7 +82,10 @@ pt.ua.hipereats/
 
 - MQTT topic per scooter: `hipereats/scooters/{scooterCode}/telemetry`.
 - JSON message: `scooterCode`, `timestamp`, `batteryPercent`, `latitude`, `longitude`, `locked`, `fault` (null when none).
-- The simulator also answers the unlock command of BR12, sent by the backend on one outbound topic per scooter. The topic names and messages of the unlock command and its acknowledgement are not defined yet (HE-50, HE-51); do not assume them.
+- `timestamp` is ISO-8601 with offset and milliseconds; `batteryPercent` is an integer from 0 to 100.
+- Unlock command of BR12, backend to simulator: topic `hipereats/scooters/{scooterCode}/commands`, QoS 1, message `commandId`, `type` (`UNLOCK`), `sentAt`. `commandId` is required and identifies the command per scooter.
+- Acknowledgement, simulator to backend: topic `hipereats/scooters/{scooterCode}/acks`, QoS 1, message `commandId`, `scooterCode`, `type`, `acknowledgedAt`. A command without id, for an unknown scooter or of an unknown type gets no acknowledgement. When no acknowledgement arrives, the backend resends the command with the **same** `commandId`; the simulator acknowledges it again without starting a second trip.
+- `simulator/README.md` has the full contract with examples.
 - The simulator and order generator values (Product Specification, 4.3) are configurable through environment variables, so that load tests can raise the rate.
 - The contract is documented and tested on both sides, so another simulator can replace ours.
 

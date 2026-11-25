@@ -14,7 +14,7 @@ Guidelines for every contributor, human or agent: how to run the project, how a 
 | Gherkin scenarios | [backend/src/test/resources/features](backend/src/test/resources/features) |
 | CI pipeline | [.github/workflows/ci.yml](.github/workflows/ci.yml) |
 
-`backend/` is the Spring Boot platform, `frontend/` the React web UI, `simulator/` the fleet simulator (still empty) and `infra/` the configuration of the other containers.
+`backend/` is the Spring Boot platform, `frontend/` the React web UI, `simulator/` the fleet simulator (MQTT contract in `simulator/README.md`) and `infra/` the configuration of the other containers.
 
 ## Set up the project
 
