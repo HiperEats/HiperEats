@@ -3,6 +3,9 @@ package pt.ua.hipereats.adapters.out.telemetry;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.OffsetDateTime;
 import pt.ua.hipereats.domain.telemetry.TelemetryReading;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.MapperFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The JSON message of the telemetry contract (AGENTS.md, section 6), as it arrives on
@@ -17,6 +20,24 @@ public record TelemetryMessage(
         Double longitude,
         Boolean locked,
         String fault) {
+
+    /**
+     * Strict JSON reader: no conversion between types, so {@code "76"}, {@code 100.9} as a battery or
+     * {@code 1} as {@code locked} are refused instead of being turned into valid-looking values.
+     */
+    private static final JsonMapper STRICT_JSON = JsonMapper.builder()
+            .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
+            .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
+            .build();
+
+    /**
+     * Reads one MQTT payload.
+     *
+     * @throws tools.jackson.core.JacksonException if it is not valid JSON or a field has the wrong type
+     */
+    public static TelemetryMessage parse(byte[] payload) {
+        return STRICT_JSON.readValue(payload, TelemetryMessage.class);
+    }
 
     /**
      * Converts the message into a domain reading.

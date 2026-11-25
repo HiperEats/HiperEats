@@ -10,7 +10,9 @@ public interface RecordTelemetryUseCase {
         /** The reading is now the scooter's latest state. */
         RECORDED,
         /** Not newer than the latest reading (duplicated or out of order), so it was ignored. */
-        IGNORED_STALE
+        IGNORED_STALE,
+        /** Dated too far ahead of the platform clock, so it was ignored (it would block later readings). */
+        IGNORED_FUTURE
     }
 
     Result record(TelemetryReading reading);
