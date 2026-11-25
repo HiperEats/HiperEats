@@ -3,6 +3,7 @@ package pt.ua.hipereats.adapters.out.telemetry;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
@@ -14,22 +15,25 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.MountableFile;
+import pt.ua.hipereats.IntegrationTest;
+import pt.ua.hipereats.application.port.in.RecordTelemetryUseCase;
 import pt.ua.hipereats.application.port.in.ScooterTelemetryQuery;
 import pt.ua.hipereats.domain.telemetry.TelemetryReading;
 
 /**
  * Runs the backend against a real Mosquitto broker (Testcontainers) and publishes telemetry as the
  * simulator does, then checks the scooter state through the query port.
+ *
+ * <p>The subscriber is created here and not by Spring, so this test shares the one application
+ * context of {@link IntegrationTest}, where telemetry is off.
+ * {@link MqttTelemetrySubscriberConfigurationTest} covers its configuration in Spring.
  */
 @Testcontainers
-@SpringBootTest(properties = "hipereats.telemetry.enabled=true")
+@IntegrationTest
 class MqttTelemetryIT {
 
     private static final long TIMEOUT_MS = 10_000;
@@ -40,11 +44,6 @@ class MqttTelemetryIT {
             .withCopyFileToContainer(MountableFile.forClasspathResource("mosquitto.conf"),
                     "/mosquitto/config/mosquitto.conf");
 
-    @DynamicPropertySource
-    static void brokerUrl(DynamicPropertyRegistry registry) {
-        registry.add("hipereats.telemetry.broker-url", MqttTelemetryIT::brokerUrl);
-    }
-
     private static String brokerUrl() {
         return "tcp://" + MOSQUITTO.getHost() + ":" + MOSQUITTO.getMappedPort(1883);
     }
@@ -53,13 +52,18 @@ class MqttTelemetryIT {
     private ScooterTelemetryQuery telemetry;
 
     @Autowired
+    private RecordTelemetryUseCase recordTelemetry;
+
     private MqttTelemetrySubscriber subscriber;
 
     /** A test client that plays the simulator. */
     private MqttClient simulator;
 
     @BeforeEach
-    void connectSimulator() throws Exception {
+    void connect() throws Exception {
+        subscriber = new MqttTelemetrySubscriber(
+                new TelemetryProperties(true, brokerUrl(), "test-backend", Duration.ofSeconds(1)), recordTelemetry);
+        subscriber.start();
         simulator = new MqttClient(brokerUrl(), "test-simulator-" + UUID.randomUUID(), new MemoryPersistence());
         simulator.connect();
         // The subscriber connects in the background: wait until it is subscribed before publishing,
@@ -68,7 +72,8 @@ class MqttTelemetryIT {
     }
 
     @AfterEach
-    void disconnectSimulator() throws MqttException {
+    void disconnect() throws MqttException {
+        subscriber.stop();
         simulator.disconnect();
         simulator.close();
     }
