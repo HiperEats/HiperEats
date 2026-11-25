@@ -86,7 +86,7 @@ We follow GitHub flow with an integration branch, `dev`. Every change reaches `d
 3. Write the tests first, see them fail and commit them; then write the code and commit it separately. This is mandatory at least for the business rules (see [Tests](#tests)).
 4. Start every commit message with the story key: `HE-12 add booking endpoint`.
 5. Run the tests and push: `git push -u origin HE-12-booking-endpoint`.
-6. Open a pull request to `dev` whose title starts with the story key (`HE-12 Add booking endpoint`), fill in the template and move the story to **In Review**. One story per pull request. GitHub suggests `main` as the base because it is the default branch: change it to `dev`.
+6. Open a pull request to `dev` whose title starts with the story key (`HE-12 Add booking endpoint`), fill in the template and move the story to **In Review**. One story per pull request.
 7. Answer the review. CI runs the build and the tests, and Claude reviews the pull request. Record in the template which of its findings you accepted or rejected, and why.
 8. At least one other member approves and CI passes. The author merges and moves the story to **Done**.
 
@@ -102,7 +102,7 @@ Agents never merge. A human approves every pull request.
 ### Merge rules
 
 - GitHub blocks direct pushes to `dev` and `main`, and blocks the merge until another member has approved and every review conversation is resolved. A new push cancels the approvals already given.
-- GitHub does not block on a failing CI yet, but the team does: never merge with CI failing. The quality gate joins this rule when it is in place (HE-40): SonarCloud with JaCoCo and the *Sonar way* gate on new code (at least 80% coverage, at most 3% duplication, A ratings, security hotspots reviewed), required to merge to `main`. A dependency check in CI on every build is also decided and not in place yet (HE-47).
+- GitHub does not block on a failing CI yet, but the team does: never merge with CI failing. The quality gate joins this rule when it is in place (HE-40): SonarCloud with JaCoCo and the *Sonar way* gate on new code (at least 80% coverage, at most 3% duplication, A ratings, security hotspots reviewed), required to merge to `dev` and `main`. A dependency check in CI on every build is also decided and not in place yet (HE-47).
 - GitHub does not check yet that a pull request to `main` comes from `dev`: check the base and the source branch before you approve or merge.
 - Choose **Create a merge commit**, also from `dev` to `main`. Squash would join the failing tests and the code in one commit, and the history would no longer show that the tests came first.
 - GitHub deletes the story branch after the merge. The rules of the repository do not allow deleting `dev` or `main`.
