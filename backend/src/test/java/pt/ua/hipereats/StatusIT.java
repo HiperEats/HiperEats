@@ -20,7 +20,7 @@ class StatusIT {
     private RestTestClient client;
 
     @Test
-    void statusEndpointIsUp() {
+    void whenStatusRequested_thenServiceIsUp() {
         client.get().uri("/api/status")
                 .exchange()
                 .expectStatus().isOk()
@@ -30,7 +30,7 @@ class StatusIT {
     }
 
     @Test
-    void actuatorHealthIsUp() {
+    void whenActuatorHealthRequested_thenStatusIsUp() {
         client.get().uri("/actuator/health")
                 .exchange()
                 .expectStatus().isOk()
