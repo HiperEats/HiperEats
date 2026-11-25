@@ -1,10 +1,43 @@
-# Walking skeleton (HE-16): web UI, backend and MQTT broker.
+# HiperEats: web UI, backend, PostgreSQL and MQTT broker.
+# First time: cp .env.example .env   (then set your own password in .env)
 # Start with: docker compose up --build   then open http://localhost:3000
 services:
+  db:
+    # Debian image, not alpine: alpine sorts text without language rules, so ORDER BY would put
+    # names such as "Águeda" or lower-case names after "Zebra". Tests use the same image.
+    image: postgres:18
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hipereats}
+      POSTGRES_USER: ${POSTGRES_USER:-hipereats}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}
+    # Only this machine can reach the database (Docker would bypass firewall rules otherwise).
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      # -h checks the TCP port the backend uses: the Unix socket already answers while the
+      # temporary server of the first initialisation is running.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   backend:
     build: ./backend
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-hipereats}
+      DB_USER: ${POSTGRES_USER:-hipereats}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}
+      # Telemetry adapter (HE-51): broker that carries the scooters' telemetry.
+      HIPEREATS_TELEMETRY_BROKERURL: tcp://mosquitto:1883
     ports:
       - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/8080 && printf \"GET /actuator/health HTTP/1.0\\r\\n\\r\\n\" >&3 && grep -q UP <&3'"]
       interval: 10s
@@ -37,3 +70,7 @@ services:
       - "1883:1883"
     volumes:
       - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+volumes:
+  # PostgreSQL data survives "docker compose down"; "docker compose down -v" erases it.
+  db-data:

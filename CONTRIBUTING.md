@@ -23,24 +23,31 @@ You need Git, **Java 21**, **Node 22** (22.22.2 or newer, with npm) and **Docker
 ```bash
 git clone https://github.com/HiperEats/HiperEats.git
 cd HiperEats
+cp .env.example .env      # once; then set your own POSTGRES_PASSWORD in .env
 docker compose up --build
 ```
 
-Open <http://localhost:3000>: the page shows the status of the backend. The backend answers on <http://localhost:8080/api/status> and the MQTT broker listens on port 1883. Stop everything with `docker compose down`.
+`.env` holds the database credentials and is never committed. Every `docker compose` command needs it.
 
-To work on one part without rebuilding the containers, run the backend and the frontend in separate terminals, with the containers stopped (both use port 8080):
+Open <http://localhost:3000>: the page shows the status of the backend. The backend answers on <http://localhost:8080/api/status>, PostgreSQL listens on `localhost:5432` (this machine only) and the MQTT broker on port 1883. Stop everything with `docker compose down`; the database data stays in the `db-data` volume, and `docker compose down -v` erases it.
+
+To work on one part without rebuilding the containers, run the backend and the frontend in separate terminals. Start only the database in Docker; the backend container must be stopped, because both use port 8080:
 
 | Directory | Command | Result |
 |---|---|---|
-| `backend/` | `./mvnw spring-boot:run` | backend on `localhost:8080` |
+| repository root | `docker compose up -d db` | PostgreSQL on `localhost:5432` |
+| `backend/` | `set -a; . ../.env; set +a; DB_URL=jdbc:postgresql://localhost:5432/$POSTGRES_DB DB_USER=$POSTGRES_USER DB_PASSWORD=$POSTGRES_PASSWORD ./mvnw spring-boot:run` | backend on `localhost:8080`, using the database of `.env` |
 | `frontend/` | `npm ci`, then `npm run dev` | web UI on `localhost:5173`, which forwards `/api` to the backend |
 
 ### Common problems
 
 | What you see | Cause and fix |
 |---|---|
-| `address already in use` (Docker) or `Port 8080 was already in use` (backend) | Another program uses the port. Run `docker compose down`, or stop the program that uses 8080, 3000 or 1883. |
+| `address already in use` (Docker) or `Port 8080 was already in use` (backend) | Another program uses the port. Run `docker compose down`, or stop the program that uses 8080, 3000, 5432 or 1883. |
 | `Cannot connect to the Docker daemon` | Docker is not running. Start it and try again. |
+| `required variable POSTGRES_PASSWORD is missing a value` | There is no `.env`. Run `cp .env.example .env` and set a password. |
+| `password authentication failed for user` | The password in `.env` changed after the database was created. Run `docker compose down -v` (erases the local data) and start again. |
+| Integration tests fail with `Could not find a valid Docker environment` | Testcontainers needs Docker running for `./mvnw verify`. |
 | `release version 21 not supported` | Maven runs with an older Java. Check it with `./mvnw -version` and point `JAVA_HOME` to Java 21. |
 | `EBADENGINE` warnings in `npm ci` | Node is too old or an unsupported version. Check it with `node --version`. |
 
