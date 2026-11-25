@@ -3,8 +3,13 @@
 services:
   backend:
     build: ./backend
+    environment:
+      # Telemetry adapter (HE-51): broker that carries the scooters' telemetry.
+      HIPEREATS_TELEMETRY_BROKERURL: tcp://mosquitto:1883
     ports:
       - "8080:8080"
+    depends_on:
+      - mosquitto
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/8080 && printf \"GET /actuator/health HTTP/1.0\\r\\n\\r\\n\" >&3 && grep -q UP <&3'"]
       interval: 10s
