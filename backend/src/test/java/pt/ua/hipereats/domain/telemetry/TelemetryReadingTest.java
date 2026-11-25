@@ -35,6 +35,19 @@ class TelemetryReadingTest {
         assertThatIllegalArgumentException().isThrownBy(() -> reading(50, 40.64, -180.01));
     }
 
+    @ParameterizedTest
+    @ValueSource(doubles = {Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY})
+    void whenCoordinateIsNotAFiniteNumber_thenReadingIsRefused(double notFinite) {
+        assertThatIllegalArgumentException().isThrownBy(() -> reading(50, notFinite, -8.65));
+        assertThatIllegalArgumentException().isThrownBy(() -> reading(50, 40.64, notFinite));
+    }
+
+    @Test
+    void whenFaultIsBlank_thenReadingIsRefused() {
+        assertThatIllegalArgumentException().isThrownBy(
+                () -> new TelemetryReading("AV-01", T0, 50, 40.64, -8.65, true, " "));
+    }
+
     @Test
     void whenCoordinatesAtTheLimits_thenReadingIsAccepted() {
         assertThatNoException().isThrownBy(() -> reading(50, 90, 180));

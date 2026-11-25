@@ -29,7 +29,7 @@ import pt.ua.hipereats.domain.telemetry.TelemetryReading;
  * simulator does, then checks the scooter state through the query port.
  */
 @Testcontainers
-@SpringBootTest
+@SpringBootTest(properties = "hipereats.telemetry.enabled=true")
 class MqttTelemetryIT {
 
     private static final long TIMEOUT_MS = 10_000;
@@ -62,8 +62,9 @@ class MqttTelemetryIT {
     void connectSimulator() throws Exception {
         simulator = new MqttClient(brokerUrl(), "test-simulator-" + UUID.randomUUID(), new MemoryPersistence());
         simulator.connect();
-        // The subscriber connects in the background: wait for it before publishing.
-        waitUntil(subscriber::isConnected);
+        // The subscriber connects in the background: wait until it is subscribed before publishing,
+        // or a QoS 0 message sent in between would be lost.
+        waitUntil(subscriber::isSubscribed);
     }
 
     @AfterEach

@@ -8,15 +8,13 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import org.junit.jupiter.api.Test;
 import pt.ua.hipereats.domain.telemetry.TelemetryReading;
-import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.core.JacksonException;
 
 /** Contract tests: the JSON of AGENTS.md section 6, as the simulator sends it, becomes a domain reading. */
 class TelemetryMessageTest {
 
-    private final JsonMapper json = JsonMapper.builder().build();
-
-    private TelemetryMessage parse(String payload) {
-        return json.readValue(payload, TelemetryMessage.class);
+    private static TelemetryMessage parse(String payload) {
+        return TelemetryMessage.parse(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     @Test
@@ -70,5 +68,37 @@ class TelemetryMessageTest {
                 """);
 
         assertThatThrownBy(message::toReading).isInstanceOf(DateTimeParseException.class);
+    }
+
+    @Test
+    void whenNumberComesAsText_thenMessageIsRefused() {
+        assertThatThrownBy(() -> parse("""
+                {"scooterCode":"AV-01","timestamp":"2026-11-25T19:40:05Z","batteryPercent":"76",
+                 "latitude":40.6405,"longitude":-8.6538,"locked":true,"fault":null}
+                """)).isInstanceOf(JacksonException.class);
+    }
+
+    @Test
+    void whenLatitudeIsTheTextNaN_thenMessageIsRefused() {
+        assertThatThrownBy(() -> parse("""
+                {"scooterCode":"AV-01","timestamp":"2026-11-25T19:40:05Z","batteryPercent":76,
+                 "latitude":"NaN","longitude":-8.6538,"locked":true,"fault":null}
+                """).toReading()).isInstanceOfAny(JacksonException.class, IllegalArgumentException.class);
+    }
+
+    @Test
+    void whenBatteryHasDecimals_thenMessageIsRefused() {
+        assertThatThrownBy(() -> parse("""
+                {"scooterCode":"AV-01","timestamp":"2026-11-25T19:40:05Z","batteryPercent":100.9,
+                 "latitude":40.6405,"longitude":-8.6538,"locked":true,"fault":null}
+                """)).isInstanceOf(JacksonException.class);
+    }
+
+    @Test
+    void whenLockedIsANumber_thenMessageIsRefused() {
+        assertThatThrownBy(() -> parse("""
+                {"scooterCode":"AV-01","timestamp":"2026-11-25T19:40:05Z","batteryPercent":76,
+                 "latitude":40.6405,"longitude":-8.6538,"locked":1,"fault":null}
+                """)).isInstanceOf(JacksonException.class);
     }
 }
