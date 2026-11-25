@@ -2,9 +2,8 @@ package pt.ua.hipereats.adapters.out.telemetry;
 
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
-import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallbackExtended;
@@ -44,10 +43,8 @@ public class MqttTelemetrySubscriber implements SmartLifecycle {
 
     private final TelemetryProperties properties;
     private final RecordTelemetryUseCase recordTelemetry;
-    private volatile ScheduledExecutorService connector;
-    private volatile MqttClient client;
-    private volatile boolean running;
-    private volatile boolean subscribed;
+    /** The current run, or null when stopped. */
+    private Session session;
 
     public MqttTelemetrySubscriber(TelemetryProperties properties, RecordTelemetryUseCase recordTelemetry) {
         this.properties = properties;
@@ -57,64 +54,9 @@ public class MqttTelemetrySubscriber implements SmartLifecycle {
     /** Can run again after {@link #stop()}: Spring stops and restarts the beans of a paused test context. */
     @Override
     public synchronized void start() {
-        running = true;
-        connector = Executors.newSingleThreadScheduledExecutor();
-        connector.execute(this::connect);
-    }
-
-    private void connect() {
-        MqttClient newClient = null;
-        try {
-            String clientId = properties.clientId() + "-" + UUID.randomUUID().toString().substring(0, 8);
-            newClient = new MqttClient(properties.brokerUrl(), clientId, new MemoryPersistence());
-            newClient.setCallback(new Callback(newClient));
-            MqttConnectOptions options = new MqttConnectOptions();
-            options.setAutomaticReconnect(true);
-            options.setMaxReconnectDelay((int) properties.reconnectInterval().toMillis());
-            options.setCleanSession(true);
-            newClient.connect(options);
-            synchronized (this) {
-                if (running) {
-                    client = newClient;
-                    return;
-                }
-            }
-            // stop() ran while connecting: nobody else will close this client.
-            closeQuietly(newClient);
-        } catch (MqttException e) {
-            closeQuietly(newClient);
-            log.warn("Telemetry broker {} unreachable ({}), retrying in {}", properties.brokerUrl(),
-                    e.getMessage(), properties.reconnectInterval());
-            retryLater(this::connect);
-        } catch (RuntimeException e) {
-            // Not expected (the URL is validated at startup), but never fail silently on the executor.
-            closeQuietly(newClient);
-            log.error("Telemetry subscriber could not start, retrying in {}", properties.reconnectInterval(), e);
-            retryLater(this::connect);
-        }
-    }
-
-    /** Called on every (re)connection: the clean session loses the subscription. */
-    private void subscribe(MqttClient mqtt) {
-        if (!running || !mqtt.isConnected()) {
-            return;
-        }
-        try {
-            mqtt.subscribe(TOPIC, QOS);
-            subscribed = true;
-            log.info("Connected to {}, subscribed to {}", mqtt.getServerURI(), TOPIC);
-        } catch (MqttException e) {
-            // Connected but not subscribed would mean no telemetry at all: keep trying.
-            log.error("Could not subscribe to {}, retrying in {}", TOPIC, properties.reconnectInterval(), e);
-            retryLater(() -> subscribe(mqtt));
-        }
-    }
-
-    private void retryLater(Runnable task) {
-        try {
-            connector.schedule(task, properties.reconnectInterval().toMillis(), TimeUnit.MILLISECONDS);
-        } catch (RejectedExecutionException stopped) {
-            // stop() was called meanwhile: no more attempts.
+        if (session == null) {
+            session = new Session();
+            session.open();
         }
     }
 
@@ -146,56 +88,112 @@ public class MqttTelemetrySubscriber implements SmartLifecycle {
     }
 
     @Override
-    public void stop() {
-        MqttClient current;
-        synchronized (this) {
-            running = false;
-            subscribed = false;
-            current = client;
-            client = null;
-        }
-        if (connector != null) {
-            connector.shutdownNow();
-        }
-        closeQuietly(current);
-    }
-
-    private static void closeQuietly(MqttClient mqtt) {
-        if (mqtt == null) {
-            return;
-        }
-        try {
-            if (mqtt.isConnected()) {
-                mqtt.disconnect();
-            }
-            mqtt.close();
-        } catch (MqttException e) {
-            log.debug("Error closing the MQTT client", e);
+    public synchronized void stop() {
+        if (session != null) {
+            session.close();
+            session = null;
         }
     }
 
     @Override
-    public boolean isRunning() {
-        return running;
+    public synchronized boolean isRunning() {
+        return session != null;
     }
 
     /** Whether the subscriber is connected and subscribed, so it receives telemetry. */
-    public boolean isSubscribed() {
-        MqttClient current = client;
-        return subscribed && current != null && current.isConnected();
+    public synchronized boolean isSubscribed() {
+        return session != null && session.isSubscribed();
     }
 
-    private final class Callback implements MqttCallbackExtended {
+    /**
+     * One run, from {@link #start()} to {@link #stop()}. Each run has its own client and connector, so
+     * an attempt that is still under way when the run ends cannot interfere with the next one.
+     */
+    private final class Session implements MqttCallbackExtended {
 
-        private final MqttClient mqtt;
+        // Daemon: an attempt under way must not delay the end of the process.
+        private final ScheduledThreadPoolExecutor connector = new ScheduledThreadPoolExecutor(1,
+                Thread.ofPlatform().name("telemetry-connector").daemon().factory());
+        private volatile MqttClient client;
+        private volatile boolean closed;
+        private volatile boolean subscribed;
 
-        Callback(MqttClient mqtt) {
-            this.mqtt = mqtt;
+        void open() {
+            connector.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
+            connector.execute(this::connect);
+        }
+
+        /** Does not wait for an attempt under way: {@link #connect()} closes its client when it ends. */
+        void close() {
+            closed = true;
+            connector.shutdown();
+            closeQuietly(client);
+        }
+
+        boolean isSubscribed() {
+            return subscribed && client.isConnected();
+        }
+
+        private void connect() {
+            MqttClient newClient = null;
+            try {
+                String clientId = properties.clientId() + "-" + UUID.randomUUID().toString().substring(0, 8);
+                newClient = new MqttClient(properties.brokerUrl(), clientId, new MemoryPersistence());
+                client = newClient;
+                newClient.setCallback(this);
+                MqttConnectOptions options = new MqttConnectOptions();
+                options.setAutomaticReconnect(true);
+                options.setMaxReconnectDelay(properties.maxReconnectDelayMillis());
+                options.setCleanSession(true);
+                newClient.connect(options);
+                if (closed) {
+                    // close() ran while connecting.
+                    closeQuietly(newClient);
+                }
+            } catch (MqttException e) {
+                closeQuietly(newClient);
+                if (!closed) {
+                    log.warn("Telemetry broker {} unreachable ({}), retrying in {}", properties.brokerUrl(),
+                            e.getMessage(), properties.reconnectInterval());
+                    retryLater(this::connect);
+                }
+            } catch (RuntimeException e) {
+                // Not expected (the URL is validated at startup), but never fail silently on the executor.
+                closeQuietly(newClient);
+                log.error("Telemetry subscriber could not start, retrying in {}", properties.reconnectInterval(), e);
+                retryLater(this::connect);
+            }
+        }
+
+        /** Called on every (re)connection: the clean session loses the subscription. */
+        private void subscribe() {
+            if (closed || !client.isConnected()) {
+                return;
+            }
+            try {
+                client.subscribe(TOPIC, QOS);
+                subscribed = true;
+                log.info("Connected to {}, subscribed to {}", client.getServerURI(), TOPIC);
+            } catch (MqttException e) {
+                if (!closed) {
+                    // Connected but not subscribed would mean no telemetry at all: keep trying.
+                    log.error("Could not subscribe to {}, retrying in {}", TOPIC, properties.reconnectInterval(), e);
+                    retryLater(this::subscribe);
+                }
+            }
+        }
+
+        private void retryLater(Runnable task) {
+            try {
+                connector.schedule(task, properties.reconnectInterval().toMillis(), TimeUnit.MILLISECONDS);
+            } catch (RejectedExecutionException stopped) {
+                // close() was called meanwhile: no more attempts.
+            }
         }
 
         @Override
         public void connectComplete(boolean reconnect, String serverUri) {
-            subscribe(mqtt);
+            subscribe();
         }
 
         @Override
@@ -212,6 +210,23 @@ public class MqttTelemetrySubscriber implements SmartLifecycle {
         @Override
         public void deliveryComplete(IMqttDeliveryToken token) {
             // The backend does not publish on this client.
+        }
+
+        private static void closeQuietly(MqttClient mqtt) {
+            if (mqtt == null) {
+                return;
+            }
+            try {
+                if (mqtt.isConnected()) {
+                    mqtt.disconnect();
+                } else {
+                    // Paho refuses to close a client that is still (re)connecting: end that attempt first.
+                    mqtt.disconnectForcibly(0, 0, false);
+                }
+                mqtt.close();
+            } catch (MqttException e) {
+                log.debug("Error closing the MQTT client", e);
+            }
         }
     }
 }

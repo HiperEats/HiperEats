@@ -5,7 +5,10 @@ import java.time.OffsetDateTime;
 import pt.ua.hipereats.domain.telemetry.TelemetryReading;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.MapperFeature;
+import tools.jackson.databind.cfg.CoercionAction;
+import tools.jackson.databind.cfg.CoercionInputShape;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.type.LogicalType;
 
 /**
  * The JSON message of the telemetry contract (AGENTS.md, section 6), as it arrives on
@@ -22,12 +25,17 @@ public record TelemetryMessage(
         String fault) {
 
     /**
-     * Strict JSON reader: no conversion between types, so {@code "76"}, {@code 100.9} as a battery or
-     * {@code 1} as {@code locked} are refused instead of being turned into valid-looking values.
+     * Strict JSON reader: no conversion between types, so {@code "76"}, {@code 100.9} as a battery,
+     * {@code 1} as {@code locked} or {@code 123} as {@code fault} are refused instead of being turned
+     * into valid-looking values.
      */
     private static final JsonMapper STRICT_JSON = JsonMapper.builder()
             .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
             .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
+            .withCoercionConfig(LogicalType.Textual, text -> text
+                    .setCoercion(CoercionInputShape.Integer, CoercionAction.Fail)
+                    .setCoercion(CoercionInputShape.Float, CoercionAction.Fail)
+                    .setCoercion(CoercionInputShape.Boolean, CoercionAction.Fail))
             .build();
 
     /**
