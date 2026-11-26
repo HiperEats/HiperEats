@@ -218,7 +218,8 @@ jobs:
   # linked to no story stay in the CI reports only.
   # Only on dev, on every push and when started by hand (Run workflow): what is merged is what
   # counts, and pull requests from Dependabot or forks get no secrets. Runs also when tests failed,
-  # so that Xray shows the failures.
+  # so that Xray shows the failures. When the backend failed before its tests (a compile error), it
+  # uploaded no reports: this job imports nothing and leaves the failure to the backend job.
   xray:
     name: Xray test results
     needs: backend
@@ -231,6 +232,8 @@ jobs:
           sparse-checkout: .github/scripts
 
       - name: Download the test reports
+        id: download
+        continue-on-error: true
         uses: actions/download-artifact@v8
         with:
           name: backend-test-reports
@@ -238,6 +241,7 @@ jobs:
 
       - name: Keep the tests linked to a story
         id: report
+        if: steps.download.outcome == 'success'
         # On its own line, so that a failing script fails the step.
         run: |
           count=$(python3 .github/scripts/xray-report.py reports/xray xray-report.xml)
@@ -245,12 +249,14 @@ jobs:
 
       # XRAY_TEST_PLAN_KEY is a repository variable (Settings, Secrets and variables, Actions,
       # Variables): the Test Plan of the current iteration, changed once per iteration.
+      # The Test Execution records the commit it tested (revision).
       - name: Import the results into Xray
-        if: steps.report.outputs.tests != '0'
+        if: steps.report.outputs.tests != '' && steps.report.outputs.tests != '0'
         env:
           XRAY_CLIENT_ID: ${{ secrets.XRAY_CLIENT_ID }}
           XRAY_CLIENT_SECRET: ${{ secrets.XRAY_CLIENT_SECRET }}
           TEST_PLAN_KEY: ${{ vars.XRAY_TEST_PLAN_KEY }}
+          TESTS: ${{ steps.report.outputs.tests }}
           XRAY_API: https://xray.cloud.getxray.app/api/v2
         run: |
           set -o pipefail
@@ -270,14 +276,18 @@ jobs:
 
           if ! response=$(curl -sS --fail-with-body -H "Authorization: Bearer $token" \
               -H "Content-Type: text/xml" --data-binary @xray-report.xml \
-              "$XRAY_API/import/execution/junit?projectKey=HE&testPlanKey=$TEST_PLAN_KEY"); then
+              "$XRAY_API/import/execution/junit?projectKey=HE&testPlanKey=$TEST_PLAN_KEY&revision=$GITHUB_SHA"); then
             echo "::error::Xray refused the report: $response"
             exit 1
           fi
           execution=$(jq -r '.key' <<< "$response")
-          echo "Test Execution $execution in Test Plan $TEST_PLAN_KEY: ${{ steps.report.outputs.tests }} tests" \
+          echo "Test Execution $execution in Test Plan $TEST_PLAN_KEY: $TESTS tests (commit $GITHUB_SHA)" \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Explain the skipped import
         if: steps.report.outputs.tests == '0'
         run: echo "::notice::No test is linked to a story yet, so nothing was imported into Xray."
+
+      - name: Explain the missing reports
+        if: steps.download.outcome != 'success'
+        run: echo "::notice::No test reports from the backend job (most likely it failed before its tests ran), so nothing was imported into Xray."

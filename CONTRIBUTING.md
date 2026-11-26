@@ -133,7 +133,7 @@ Agents never merge. A human approves every pull request.
 - Unit tests for business logic, with the boundary values of each rule; integration tests (adapters, REST API, and Testcontainers with PostgreSQL 18 and Mosquitto) run separately from unit tests.
 - Acceptance criteria of core stories are Gherkin scenarios automated with Cucumber, tagged with the story (`@HE-29`) and the business rule they cover (for example `@BR1`).
 - Scenarios of stories not implemented yet are tagged `@wip` and left out of the build. When you implement a story, write its steps in `backend/src/test/java/pt/ua/hipereats/acceptance` and remove `@wip` from its feature file.
-- Link every test of a story to it, so that Xray shows the story's coverage:
+- Link every test of a story to it, so that Xray shows the story's coverage. The key must be an existing Story or Epic in Jira, the requirement types set up in Xray: a task or a mistyped key can make Xray refuse the import.
   - **Gherkin:** the story tag on the feature (`@HE-29`) is enough; every scenario of the feature covers that story.
   - **JUnit (backend):** annotate each test method with `@Requirement("HE-29")` (`app.getxray.xray.junit.customjunitxml.annotations.Requirement`); on the class it is ignored. A test of a business rule that serves several stories can name them all: `@Requirement({"HE-29", "HE-30"})`.
 

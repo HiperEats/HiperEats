@@ -29,6 +29,17 @@ def outcome(testcase):
     return "passed"
 
 
+def total_time(testcases):
+    """The time of the kept test cases only, not of the whole suite."""
+    seconds = 0.0
+    for case in testcases:
+        try:
+            seconds += float(case.get("time", "0"))
+        except ValueError:
+            pass
+    return f"{seconds:.3f}"
+
+
 def suites_of(report):
     root = ET.parse(report).getroot()
     return [root] if root.tag == "testsuite" else root.findall("testsuite")
@@ -47,7 +58,7 @@ def story_suites(reports_dir):
                 "failures": str(outcomes.count("failure")),
                 "errors": str(outcomes.count("error")),
                 "skipped": str(outcomes.count("skipped")),
-                "time": suite.get("time", "0"),
+                "time": total_time(cases),
             })
             if suite.get("timestamp"):
                 story_suite.set("timestamp", suite.get("timestamp"))
