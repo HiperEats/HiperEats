@@ -126,7 +126,7 @@ pt.ua.hipereats/
 
 ## 11. Definition of ready and definition of done
 
-- Before you start a story or task, check that it meets the definition of ready in `CONTRIBUTING.md`. If it does not, do not start: tell the human what is missing (for example acceptance criteria, BR references or Gherkin scenarios).
+- Before you start a story or task, check what you can see of the definition of ready in `CONTRIBUTING.md` (story format, acceptance criteria, BR IDs, Gherkin scenarios) and ask the human to confirm the parts that are in Jira (story points, "is blocked by" links, review by the Product Owner). If something is missing, do not start: tell the human what is missing.
 - See the definition of done in `CONTRIBUTING.md`.
 
 ## 12. Build and test commands

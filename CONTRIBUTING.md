@@ -147,19 +147,20 @@ AI tools are welcome; the responsibility stays with the person who opens the pul
 
 ## Definition of ready
 
-A story is ready, and may move to **In Progress**, when:
+A story is ready, and may enter a sprint at sprint planning, when:
 
-- it is written as `As a <role>, I want to <action>, so that <benefit>`;
-- it has a few acceptance criteria that bound it: only what is needed for it to work;
-- the business rules it applies are referenced by their ID (`BR<n>`) from section 3.2 of the Product Specification, and their values are there;
-- a core story has its Gherkin scenarios in `backend/src/test/resources/features`, tagged with the story (`@HE-<n>`) and the rules (`@BR<n>`), still `@wip`;
-- its dependencies on other stories are identified and linked in Jira ("is blocked by"), and none of them blocks it now, or the pull request says how it works around it;
+- it follows the [story format](#stories) and has a few acceptance criteria that bound it;
+- if it applies business rules, they are referenced by their ID (`BR<n>`) and section 3.2 of the Product Specification gives the values it needs; if a value is missing, ask the Product Owner;
+- if it is a core story, its Gherkin scenarios are written and reviewed, tagged with the story (`@HE-<n>`) and the rules (`@BR<n>`): either already in `backend/src/test/resources/features`, still `@wip`, or in the Jira story, to become the first commit of its pull request, tagged `@wip`;
+- its dependencies on other stories are identified and linked in Jira ("is blocked by"), and none of them blocks it now, or the team agreed a workaround, noted in the Jira story and repeated in the pull request;
 - the Product Owner and the team have reviewed it at grooming or sprint planning;
-- it has story points, agreed by the team.
+- it has story points on the Fibonacci scale, agreed by the team.
+
+Core stories are the user stories of the mandatory MVP. Tasks and the extensions (geofencing and predictive maintenance) are not core stories **(proposal)**.
 
 A task (for example of the *Platform and quality* epic) is ready when it has a clear goal, acceptance criteria and its dependencies identified.
 
-If a story you pick is not ready, do not start it: ask the Product Owner, and complete it or pick another one.
+If a story or task you pick is not ready, do not start it: ask the Product Owner, and complete it or pick another one.
 
 ## Definition of done
 
