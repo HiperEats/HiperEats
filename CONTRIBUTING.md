@@ -125,7 +125,7 @@ The *Dependencies (vulnerability scan)* job fails when a dependency has a HIGH o
 
    After the expiry date the entry no longer applies and the job fails again, so the exception is reviewed instead of forgotten.
 
-What the job covers: the Maven dependencies (compile and runtime scopes) of the backend and the simulator, and every npm dependency of the frontend, development dependencies included. It does not scan Maven test dependencies: Dependabot opens pull requests to update them, and its alerts report their known vulnerabilities. Dependabot alerts and Dependabot security updates must stay on in the repository settings (Advanced Security).
+What the job covers: the Maven dependencies (compile and runtime scopes) of the backend and the simulator, and every npm dependency of the frontend, development dependencies included. It does not scan Maven test dependencies (Testcontainers, Cucumber and the libraries they bring): Dependabot opens pull requests to update them, but nothing checks them for known vulnerabilities: Dependabot alerts cannot match them, because the dependency graph of the repository lists the Maven dependencies without their resolved versions. Dependabot alerts and Dependabot security updates must stay on in the repository settings (Advanced Security).
 
 The base images of the Dockerfiles and of `docker-compose.yml` are not scanned. Most of their tags name only a major version (`postgres:18`, `node:22-alpine`, `eclipse-temurin:21-jre`), so Dependabot proposes no update for them, because new majors are ignored on purpose. Those tags still receive the patched builds of their major: rebuild with `docker compose build --pull` and `docker compose pull` to get them.
 

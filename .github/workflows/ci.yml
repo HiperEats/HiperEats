@@ -202,8 +202,9 @@ jobs:
     # dependencies of the backend and the simulator, and the npm dependencies of the frontend.
     # - npm: development dependencies are included too (TRIVY_INCLUDE_DEV_DEPS, npm only).
     # - Maven: Trivy covers the compile and runtime scopes only, not test, provided or optional
-    #   (Testcontainers, Cucumber...); Dependabot opens their update pull requests, and its
-    #   alerts (repository settings) report their known vulnerabilities.
+    #   (Testcontainers, Cucumber...). Dependabot opens their update pull requests, but nothing
+    #   checks them for known vulnerabilities: the dependency graph of the repository has no
+    #   resolved Maven versions, so Dependabot alerts cannot match them either.
     # - The base images of the Dockerfiles and of docker-compose.yml are not scanned at all.
     # Trivy reads the Maven dependencies from the local repository only (TRIVY_OFFLINE_SCAN):
     # without it, it downloads every POM from Maven Central, which rate-limits CI (HTTP 429) and
@@ -225,10 +226,25 @@ jobs:
             simulator/pom.xml
 
       # Puts the dependencies of both Maven projects in ~/.m2 (cached), where Trivy reads them.
+      # setup-java restores the cache only when both pom.xml are unchanged, so after a change to
+      # either one everything is downloaded from Maven Central, which can answer HTTP 429. Each
+      # project gets up to three attempts, 30 seconds apart. If this step still fails, it is the
+      # rate limit, not a vulnerability: re-run the job.
       - name: Resolve Maven dependencies
         run: |
-          (cd backend && ./mvnw -B -ntp -q dependency:resolve)
-          (cd simulator && ./mvnw -B -ntp -q dependency:resolve)
+          resolve() {
+            for attempt in 1 2 3; do
+              ./mvnw -B -ntp -q dependency:resolve && return 0
+              if [ "$attempt" -lt 3 ]; then
+                echo "::warning::Resolving the dependencies of $1 failed (attempt $attempt of 3), retrying in 30 seconds"
+                sleep 30
+              fi
+            done
+            echo "::error::Could not resolve the dependencies of $1; if the log shows HTTP 429, re-run the job"
+            return 1
+          }
+          (cd backend && resolve backend)
+          (cd simulator && resolve simulator)
 
       # The action is pinned to a full commit SHA, not a tag: in March 2026 most trivy-action tags
       # were rewritten to point to malware (GHSA-69fq-xp46-6x23). v0.36.0 is an immutable release
