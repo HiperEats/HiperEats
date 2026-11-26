@@ -10,8 +10,9 @@ import java.util.regex.Pattern;
  *
  * @param id           null until the account is saved
  * @param passwordHash the password hashed by the password hasher; never the password itself
+ * @param active       false once an admin deactivates the account: it can no longer log in (HE-36)
  */
-public record UserAccount(Long id, String email, String passwordHash, Role role) {
+public record UserAccount(Long id, String email, String passwordHash, Role role, boolean active) {
 
     /** Something before and after one "@"; the real check is that the person receives mail there. */
     private static final Pattern EMAIL = Pattern.compile("[^@\\s]+@[^@\\s]+");
@@ -29,9 +30,14 @@ public record UserAccount(Long id, String email, String passwordHash, Role role)
         }
     }
 
-    /** A new account, not saved yet. */
+    /** A new account, not saved yet. It starts active. */
     public static UserAccount newAccount(String email, String passwordHash, Role role) {
-        return new UserAccount(null, email, passwordHash, role);
+        return new UserAccount(null, email, passwordHash, role, true);
+    }
+
+    /** The same account, activated or deactivated. */
+    public UserAccount withActive(boolean newActive) {
+        return new UserAccount(id, email, passwordHash, role, newActive);
     }
 
     /** Trims and lower-cases an email, as it is stored; null becomes "". */
@@ -42,6 +48,6 @@ public record UserAccount(Long id, String email, String passwordHash, Role role)
     /** Never prints the password hash (it would end up in logs). */
     @Override
     public String toString() {
-        return "UserAccount[id=" + id + ", email=" + email + ", role=" + role + "]";
+        return "UserAccount[id=" + id + ", email=" + email + ", role=" + role + ", active=" + active + "]";
     }
 }

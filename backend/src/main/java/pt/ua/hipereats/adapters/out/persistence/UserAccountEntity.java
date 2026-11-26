@@ -30,6 +30,9 @@ class UserAccountEntity {
     @Column(nullable = false)
     private Role role;
 
+    @Column(nullable = false)
+    private boolean active;
+
     protected UserAccountEntity() {
         // For JPA.
     }
@@ -40,10 +43,11 @@ class UserAccountEntity {
         entity.email = account.email();
         entity.passwordHash = account.passwordHash();
         entity.role = account.role();
+        entity.active = account.active();
         return entity;
     }
 
     UserAccount toDomain() {
-        return new UserAccount(id, email, passwordHash, role);
+        return new UserAccount(id, email, passwordHash, role, active);
     }
 }
