@@ -69,7 +69,7 @@ Run the tests of every part you changed before opening a pull request. CI runs `
 
 If you changed only documentation (Markdown files or images), you do not need to set up the project or run the tests: check the links and how the page looks on GitHub. The branch, the pull request and the approval are the same, and CI still runs.
 
-Reports: `backend/target/surefire-reports/` (unit), `backend/target/failsafe-reports/` (integration), `backend/target/cucumber/cucumber.html` (acceptance) and `backend/target/site/jacoco/index.html` (coverage). Without `clean`, the coverage of earlier runs is added to the report.
+Reports: `backend/target/surefire-reports/` (unit), `backend/target/failsafe-reports/` (integration), `backend/target/cucumber/cucumber.html` (acceptance), `backend/target/site/jacoco/index.html` (coverage) and `backend/target/xray/` (the reports for Xray). Without `clean`, the coverage of earlier runs is added to the report.
 
 ## Work process
 
@@ -166,7 +166,13 @@ Agents never merge. A human approves every pull request.
 - Unit tests for business logic, with the boundary values of each rule; integration tests (adapters, REST API, and Testcontainers with PostgreSQL 18 and Mosquitto) run separately from unit tests.
 - Acceptance criteria of core stories are Gherkin scenarios automated with Cucumber, tagged with the story (`@HE-29`) and the business rule they cover (for example `@BR1`).
 - Scenarios of stories not implemented yet are tagged `@wip` and left out of the build. When you implement a story, write its steps in `backend/src/test/java/pt/ua/hipereats/acceptance` and remove `@wip` from its feature file.
-- Tests are linked to their Jira story so that Xray reports coverage: the story tag in Gherkin, and `@Requirement` in JUnit once `xray-junit-extensions` is in `backend/pom.xml`.
+- Link every test of a story to it, so that Xray shows the story's coverage. The key must be an existing Story or Epic in Jira, the requirement types set up in Xray: a task or a mistyped key can make Xray refuse the import.
+  - **Gherkin:** the story tag on the feature (`@HE-29`) is enough; every scenario of the feature covers that story.
+  - **JUnit (backend):** annotate each test method with `@Requirement("HE-29")` (`app.getxray.xray.junit.customjunitxml.annotations.Requirement`); on the class it is ignored. A test of a business rule that serves several stories can name them all: `@Requirement({"HE-29", "HE-30"})`.
+
+  On every push to `dev`, CI imports the results of the tests linked to a story into Xray (job *Xray test results*) as a Test Execution of the current iteration's Test Plan, set in the repository variable `XRAY_TEST_PLAN_KEY`. Tests linked to no story (adapters, configuration) and scenarios tagged `@wip` are not imported. The listener of `xray-junit-extensions` writes the reports to `backend/target/xray/`.
+
+  Xray creates a Test the first time it sees one and links it to its story; it recognises it later by its name (class and method in JUnit, feature and scenario in Gherkin). So keep scenario names unique within a feature, and when you rename a linked test, scenario, test class or feature, delete the old Test in Xray: otherwise it stays linked to the story with its last result. The rows of a Scenario Outline are named by their position (`Example #1.2`), so adding or reordering rows renames them too. The runs of a parameterized JUnit test share one name, so Xray does not tell them apart: name the case in the assertion message so a failure says which one.
 - Never weaken, skip or delete a test to make a build pass.
 
 ## AI use

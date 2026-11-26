@@ -98,7 +98,7 @@ pt.ua.hipereats/
 - **Unit tests** are named `*Test` and run with Surefire; **integration tests** are named `*IT` and run with Failsafe, separately **(proposal)**.
 - **Integration tests** cover persistence, the adapters (telemetry, payments) and the REST API. They use Testcontainers for the database (PostgreSQL 18, the same engine as production) and the MQTT broker (Mosquitto). Tests never call the real Stripe API in CI; use a simulated Stripe.
 - **Acceptance tests:** Gherkin features with Cucumber, tagged with the rule they cover (`@BR1`) and the story key (`@HE-12`).
-- **Traceability:** link JUnit tests to their Jira story with `@Requirement("HE-12")` from `xray-junit-extensions`, so CI results reach Xray.
+- **Traceability:** link JUnit tests to their Jira story with `@Requirement("HE-12")` from `xray-junit-extensions`; Gherkin scenarios are linked by the story tag of their feature (`@HE-12`). The key must be an existing Story or Epic, never a task. CI imports the results of `dev` into Xray.
 - **End-to-end tests** (Playwright) do not run on every build. Load tests (k6) check the SLO thresholds.
 - Test names follow `whenX_thenY`: `whenBatteryBelowRequiredRange_thenBookingIsRefused`. They state the situation and the observable result, not the method called.
 - Tests of a business rule also have a `@DisplayName` that starts with the rule ID: `@DisplayName("BR1: booking refused below the required range")`.
