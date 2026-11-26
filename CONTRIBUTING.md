@@ -58,7 +58,7 @@ Run the tests of every part you changed before opening a pull request. CI runs `
 | Directory | Command | What it runs |
 |---|---|---|
 | `backend/` | `./mvnw test` | unit tests (`*Test`) |
-| `backend/` | `./mvnw verify` | unit, integration (`*IT`) and Cucumber acceptance tests |
+| `backend/` | `./mvnw clean verify` | unit, integration (`*IT`) and Cucumber acceptance tests, and the coverage report of all of them |
 | `backend/` | `./mvnw test -Dtest=StatusControllerTest` | one unit test class |
 | `simulator/` | `./mvnw test` | unit tests (`*Test`) |
 | `simulator/` | `./mvnw verify` | unit and integration (`*IT`) tests, with Mosquitto in Docker |
@@ -69,7 +69,7 @@ Run the tests of every part you changed before opening a pull request. CI runs `
 
 If you changed only documentation (Markdown files or images), you do not need to set up the project or run the tests: check the links and how the page looks on GitHub. The branch, the pull request and the approval are the same, and CI still runs.
 
-Reports: `backend/target/surefire-reports/` (unit), `backend/target/failsafe-reports/` (integration) and `backend/target/cucumber/cucumber.html` (acceptance).
+Reports: `backend/target/surefire-reports/` (unit), `backend/target/failsafe-reports/` (integration), `backend/target/cucumber/cucumber.html` (acceptance) and `backend/target/site/jacoco/index.html` (coverage). Without `clean`, the coverage of earlier runs is added to the report.
 
 ## Workflow
 
@@ -104,7 +104,8 @@ Agents never merge. A human approves every pull request.
 ### Merge rules
 
 - GitHub blocks direct pushes to `dev` and `main`, and blocks the merge until another member has approved and every review conversation is resolved. A new push cancels the approvals already given.
-- GitHub does not block on a failing CI yet, but the team does: never merge with CI failing. The quality gate joins this rule when it is in place (HE-40): SonarCloud with JaCoCo and the *Sonar way* gate on new code (at least 80% coverage, at most 3% duplication, A ratings, security hotspots reviewed), required to merge to `dev` and `main`. A dependency check in CI on every build is also decided and not in place yet (HE-47).
+- GitHub also blocks the merge until these checks pass: `Backend (build and tests)`, `Simulator (build and tests)`, `Frontend (lint, tests and build)` and `Quality gate (SonarCloud)`. The ruleset of `dev` and `main` requires them from the merge of HE-40 on; until then, never merge with CI failing. The quality gate also fails when the backend job fails. The gate is SonarCloud with JaCoCo and *Sonar way* on the new code of the pull request: at least 80% coverage, at most 3% duplication, A ratings, security hotspots reviewed. SonarCloud ignores coverage and duplication below 20 new lines. The job `Quality gate (SonarCloud)` fails when the gate fails; the SonarCloud check of the pull request says why. It covers the backend only. Pull requests from Dependabot or from forks get no SonarCloud token, so the job passes without an analysis and the reviewer looks closer.
+- A dependency check in CI on every build is also decided and not in place yet (HE-47).
 - GitHub does not check yet that a pull request to `main` comes from `dev`: check the base and the source branch before you approve or merge.
 - Choose **Create a merge commit**, also from `dev` to `main`. Squash would join the failing tests and the code in one commit, and the history would no longer show that the tests came first.
 - GitHub deletes the story branch after the merge. The rules of the repository do not allow deleting `dev` or `main`.
