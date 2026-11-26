@@ -1,4 +1,4 @@
-@HE-29 @wip
+@HE-29
 Feature: Register scooter
   As an operator, I want to register a scooter at a store, so that it joins that store's fleet.
 
