@@ -37,7 +37,7 @@ Every member is also a developer.
 
 The backend is one deployable built with ports and adapters: the domain and services never call the fleet simulator, Stripe or the database directly, only through their ports.
 
-**Logical view:** modules, ports and adapters, and the external systems they reach.
+**Logical view:** modules, ports and adapters, the main technology of each building block and where it runs: the web UI in the user's browser, the backend, database, MQTT broker and fleet simulator each in its own container, and Stripe as an external service.
 
 ![HiperEats logical view](docs/architecture/logical-view.png)
 
