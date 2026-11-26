@@ -8,6 +8,7 @@ import pt.ua.hipereats.application.port.out.ScooterRepository;
 import pt.ua.hipereats.application.port.out.StoreRepository;
 import pt.ua.hipereats.domain.fleet.Scooter;
 import pt.ua.hipereats.domain.fleet.ScooterCodeAlreadyUsedException;
+import pt.ua.hipereats.domain.fleet.ScooterState;
 import pt.ua.hipereats.domain.fleet.Store;
 
 /** Stores and scooters in PostgreSQL, through JPA. */
@@ -61,7 +62,7 @@ class FleetPersistenceAdapter implements StoreRepository, ScooterRepository {
     }
 
     @Override
-    public void update(Scooter scooter) {
+    public void update(Scooter scooter, ScooterState from) {
         scooters.updateState(scooter.code(), scooter.state());
     }
 }

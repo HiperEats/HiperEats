@@ -13,6 +13,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -192,6 +193,7 @@ class ScooterControllerTest {
 
         assertThat(result).hasStatus(HttpStatus.NOT_FOUND)
                 .hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
+        assertThat(result).bodyJson().extractingPath("$.title").isEqualTo("Scooter not found");
         then(scooterQuery).should().findByCode("XX-99");
     }
 
@@ -200,6 +202,25 @@ class ScooterControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json)
                 .exchange();
+    }
+
+    /** A state change that is not allowed here is answered with a ProblemDetail and changes nothing. */
+    private void assertStateChangeBadRequest(MvcTestResult result) {
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST)
+                .hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
+        then(retireScooter).should(never()).retire(any());
+    }
+
+    @Test
+    void whenStateIsMissing_thenBadRequest() {
+        assertStateChangeBadRequest(patch("AV-01", "{}"));
+    }
+
+    @Test
+    void whenStateIsUnknown_thenBadRequest() {
+        assertStateChangeBadRequest(patch("AV-01", """
+                {"state": "BROKEN"}
+                """));
     }
 
     @Test
@@ -254,5 +275,19 @@ class ScooterControllerTest {
         assertThat(result).hasStatus(HttpStatus.BAD_REQUEST)
                 .hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
         then(retireScooter).should(never()).retire(any());
+    }
+
+    /** Another change holds the scooter's lock for longer than the lock timeout. */
+    @Test
+    void whenScooterIsLockedByAnotherChange_thenConflict() {
+        given(retireScooter.retire("AV-01"))
+                .willThrow(new CannotAcquireLockException("lock timeout"));
+
+        MvcTestResult result = patch("AV-01", """
+                {"state": "RETIRED"}
+                """);
+
+        assertThat(result).hasStatus(HttpStatus.CONFLICT)
+                .hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
     }
 }

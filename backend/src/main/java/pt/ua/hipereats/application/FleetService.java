@@ -61,7 +61,7 @@ public class FleetService implements RegisterScooterUseCase, RetireScooterUseCas
         Scooter scooter = scooters.findAndLock(code)
                 .orElseThrow(() -> new ScooterNotFoundException(code));
         Scooter changed = change.apply(scooter);
-        scooters.update(changed);
+        scooters.update(changed, scooter.state());
         return changed;
     }
 }

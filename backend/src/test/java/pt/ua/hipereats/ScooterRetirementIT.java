@@ -2,6 +2,8 @@ package pt.ua.hipereats;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -103,5 +105,34 @@ class ScooterRetirementIT {
 
         assertThat(results).containsOnly(200, 409).containsOnlyOnce(200);
         assertThat(data.stateOf(code)).isEqualTo(ScooterState.RETIRED);
+    }
+
+    /**
+     * Another transaction holds the scooter's row lock. The retirement waits for the lock timeout
+     * (3 s), not forever, and is refused; the scooter keeps its state.
+     */
+    @Test
+    void whenScooterIsLockedByAnotherTransaction_thenConflictAfterTheLockTimeout() throws Exception {
+        String code = data.addScooter(storeId, ScooterState.INACTIVE);
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        try (Connection holder = dataSource.getConnection()) {
+            holder.setAutoCommit(false);
+            try (PreparedStatement lock =
+                    holder.prepareStatement("SELECT id FROM scooters WHERE code = ? FOR UPDATE")) {
+                lock.setString(1, code);
+                lock.executeQuery().close();
+            }
+            try {
+                Future<Integer> status =
+                        pool.submit(() -> retire(code).returnResult().getStatus().value());
+
+                assertThat(status.get(15, TimeUnit.SECONDS)).isEqualTo(409);
+            } finally {
+                holder.rollback();
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        assertThat(data.stateOf(code)).isEqualTo(ScooterState.INACTIVE);
     }
 }

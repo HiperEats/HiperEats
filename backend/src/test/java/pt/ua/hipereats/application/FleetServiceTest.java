@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.OptimisticLockingFailureException;
 import pt.ua.hipereats.application.port.in.RegisterScooterCommand;
 import pt.ua.hipereats.application.port.out.ScooterRepository;
 import pt.ua.hipereats.application.port.out.StoreRepository;
@@ -36,6 +37,7 @@ class FleetServiceTest {
 
     private static final class InMemoryScooters implements ScooterRepository {
         private final List<Scooter> added = new ArrayList<>();
+        private final List<String> locked = new ArrayList<>();
 
         @Override
         public void add(Scooter scooter) {
@@ -49,11 +51,15 @@ class FleetServiceTest {
 
         @Override
         public Optional<Scooter> findAndLock(String code) {
+            locked.add(code);
             return findByCode(code);
         }
 
         @Override
-        public void update(Scooter scooter) {
+        public void update(Scooter scooter, ScooterState from) {
+            if (stateOf(scooter.code()) != from) {
+                throw new OptimisticLockingFailureException("state of " + scooter.code() + " changed");
+            }
             added.replaceAll(s -> s.code().equals(scooter.code()) ? scooter : s);
         }
 
@@ -123,6 +129,15 @@ class FleetServiceTest {
 
         assertThat(retired.state()).isEqualTo(ScooterState.RETIRED);
         assertThat(scooters.stateOf("AV-20")).isEqualTo(ScooterState.RETIRED);
+    }
+
+    @Test
+    void whenScooterIsRetired_thenItIsLockedWhileItChanges() {
+        scooters.put("AV-23", ScooterState.INACTIVE);
+
+        service.retire("AV-23");
+
+        assertThat(scooters.locked).containsExactly("AV-23");
     }
 
     @Test
