@@ -16,9 +16,15 @@
 
 	<properties>
 		<java.version>21</java.version>
-		<!-- Empty by default; JaCoCo will add its agent here. Surefire and Failsafe append Mockito's. -->
+		<!-- Empty by default; JaCoCo adds its agent here. Surefire and Failsafe append Mockito's. -->
 		<argLine></argLine>
 		<cucumber.version>8.0.4</cucumber.version>
+		<!-- SonarCloud project. The token comes from the environment (SONAR_TOKEN). -->
+		<sonar.organization>hipereats</sonar.organization>
+		<sonar.projectKey>HiperEats_HiperEats</sonar.projectKey>
+		<!-- Coverage of all the tests, and the results of the unit and integration tests. -->
+		<sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+		<sonar.junit.reportPaths>${project.build.directory}/surefire-reports,${project.build.directory}/failsafe-reports</sonar.junit.reportPaths>
 	</properties>
 
 	<dependencyManagement>
@@ -121,6 +127,16 @@
 	</dependencies>
 
 	<build>
+		<pluginManagement>
+			<plugins>
+				<!-- "mvn sonar:sonar" sends the analysis to SonarCloud; used by CI only. -->
+				<plugin>
+					<groupId>org.sonarsource.scanner.maven</groupId>
+					<artifactId>sonar-maven-plugin</artifactId>
+					<version>5.9.0.7382</version>
+				</plugin>
+			</plugins>
+		</pluginManagement>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
@@ -135,6 +151,28 @@
 					<execution>
 						<goals>
 							<goal>properties</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<!-- Test coverage. Surefire and Failsafe write to the same file (target/jacoco.exec), so the
+			     report of "mvn verify" covers unit, integration and Cucumber tests together.
+			     SonarCloud reads target/site/jacoco/jacoco.xml (sonar.coverage.jacoco.xmlReportPaths). -->
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>0.8.16</version>
+				<executions>
+					<execution>
+						<id>prepare-agent</id>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>report</id>
+						<goals>
+							<goal>report</goal>
 						</goals>
 					</execution>
 				</executions>

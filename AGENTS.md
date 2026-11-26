@@ -133,7 +133,7 @@ See the definition of done in `CONTRIBUTING.md`.
 Backend (in `backend/`, Java 21):
 
 - `./mvnw test`: unit tests (`*Test`, Surefire)
-- `./mvnw verify`: unit and integration tests (`*IT`, Failsafe) and packaging
+- `./mvnw clean verify`: unit and integration tests (`*IT`, Failsafe), packaging and the JaCoCo coverage report of all the tests (`target/site/jacoco/`)
 - `./mvnw spring-boot:run`: run on `localhost:8080`
 
 Simulator (in `simulator/`, Java 21):
