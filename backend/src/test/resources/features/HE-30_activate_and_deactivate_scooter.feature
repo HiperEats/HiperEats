@@ -1,4 +1,4 @@
-@HE-30 @wip
+@HE-30
 Feature: Activate and deactivate scooter
   As an operator, I want to activate and deactivate a scooter, so that only scooters fit for use can be booked.
 

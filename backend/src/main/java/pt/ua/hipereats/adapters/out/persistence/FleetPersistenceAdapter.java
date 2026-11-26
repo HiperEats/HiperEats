@@ -54,4 +54,14 @@ class FleetPersistenceAdapter implements StoreRepository, ScooterRepository {
     public Optional<Scooter> findByCode(String code) {
         return scooters.findByCode(code).map(ScooterEntity::toScooter);
     }
+
+    @Override
+    public Optional<Scooter> findAndLock(String code) {
+        return Optional.empty();
+    }
+
+    @Override
+    public void update(Scooter scooter) {
+        // HE-30: not implemented yet
+    }
 }

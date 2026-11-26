@@ -7,4 +7,14 @@ package pt.ua.hipereats.domain.fleet;
  * @param storeId the store whose fixed fleet the scooter belongs to
  */
 public record Scooter(String code, ScooterType type, ScooterState state, long storeId) {
+
+    /** The operator activates the scooter (HE-30). */
+    public Scooter activate() {
+        return this;
+    }
+
+    /** The operator deactivates the scooter (HE-30). */
+    public Scooter deactivate() {
+        return this;
+    }
 }

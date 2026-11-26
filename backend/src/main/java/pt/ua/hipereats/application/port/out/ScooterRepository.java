@@ -15,4 +15,13 @@ public interface ScooterRepository {
     void add(Scooter scooter);
 
     Optional<Scooter> findByCode(String code);
+
+    /**
+     * Loads the scooter and locks it until the transaction ends, so that changes of its state run
+     * one after the other.
+     */
+    Optional<Scooter> findAndLock(String code);
+
+    /** Stores the new state of an existing scooter. */
+    void update(Scooter scooter);
 }
