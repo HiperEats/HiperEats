@@ -3,11 +3,13 @@ package pt.ua.hipereats.adapters.out.persistence;
 import java.util.Optional;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 import pt.ua.hipereats.application.port.out.ScooterRepository;
 import pt.ua.hipereats.application.port.out.StoreRepository;
 import pt.ua.hipereats.domain.fleet.Scooter;
 import pt.ua.hipereats.domain.fleet.ScooterCodeAlreadyUsedException;
+import pt.ua.hipereats.domain.fleet.ScooterState;
 import pt.ua.hipereats.domain.fleet.Store;
 
 /** Stores and scooters in PostgreSQL, through JPA. */
@@ -61,7 +63,11 @@ class FleetPersistenceAdapter implements StoreRepository, ScooterRepository {
     }
 
     @Override
-    public void update(Scooter scooter) {
-        scooters.updateState(scooter.code(), scooter.state());
+    public void update(Scooter scooter, ScooterState from) {
+        int changed = scooters.updateState(scooter.code(), from, scooter.state());
+        if (changed != 1) {
+            throw new OptimisticLockingFailureException("Scooter " + scooter.code()
+                    + " is no longer " + from + "; its state was not changed");
+        }
     }
 }

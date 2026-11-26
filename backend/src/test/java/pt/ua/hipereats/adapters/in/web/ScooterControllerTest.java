@@ -13,6 +13,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -21,7 +22,7 @@ import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import pt.ua.hipereats.application.port.in.RegisterScooterCommand;
 import pt.ua.hipereats.application.port.in.RegisterScooterUseCase;
-import pt.ua.hipereats.application.port.in.ScooterActivationUseCase;
+import pt.ua.hipereats.application.port.in.ChangeScooterStateUseCase;
 import pt.ua.hipereats.application.port.in.ScooterQuery;
 import pt.ua.hipereats.domain.fleet.Scooter;
 import pt.ua.hipereats.domain.fleet.ScooterCodeAlreadyUsedException;
@@ -49,7 +50,7 @@ class ScooterControllerTest {
     private ScooterQuery scooterQuery;
 
     @MockitoBean
-    private ScooterActivationUseCase scooterActivation;
+    private ChangeScooterStateUseCase changeScooterState;
 
     private MvcTestResult post(String json) {
         return mvc.post().uri("/api/v1/scooters")
@@ -192,6 +193,7 @@ class ScooterControllerTest {
 
         assertThat(result).hasStatus(HttpStatus.NOT_FOUND)
                 .hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
+        assertThat(result).bodyJson().extractingPath("$.title").isEqualTo("Scooter not found");
         then(scooterQuery).should().findByCode("XX-99");
     }
 
@@ -206,13 +208,13 @@ class ScooterControllerTest {
     private void assertStateChangeBadRequest(MvcTestResult result) {
         assertThat(result).hasStatus(HttpStatus.BAD_REQUEST)
                 .hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
-        then(scooterActivation).should(never()).activate(any());
-        then(scooterActivation).should(never()).deactivate(any());
+        then(changeScooterState).should(never()).activate(any());
+        then(changeScooterState).should(never()).deactivate(any());
     }
 
     @Test
     void whenOperatorSetsTheStateToAvailable_thenTheScooterIsActivated() {
-        given(scooterActivation.activate("AV-01")).willReturn(
+        given(changeScooterState.activate("AV-01")).willReturn(
                 new Scooter("AV-01", ScooterType.STANDARD, ScooterState.AVAILABLE, 1L));
 
         MvcTestResult result = patch("AV-01", """
@@ -222,12 +224,12 @@ class ScooterControllerTest {
         assertThat(result).hasStatusOk().bodyJson().isLenientlyEqualTo("""
                 {"code": "AV-01", "type": "STANDARD", "state": "AVAILABLE", "storeId": 1}
                 """);
-        then(scooterActivation).should().activate("AV-01");
+        then(changeScooterState).should().activate("AV-01");
     }
 
     @Test
     void whenOperatorSetsTheStateToInactive_thenTheScooterIsDeactivated() {
-        given(scooterActivation.deactivate("AV-01")).willReturn(
+        given(changeScooterState.deactivate("AV-01")).willReturn(
                 new Scooter("AV-01", ScooterType.STANDARD, ScooterState.INACTIVE, 1L));
 
         MvcTestResult result = patch("AV-01", """
@@ -237,12 +239,12 @@ class ScooterControllerTest {
         assertThat(result).hasStatusOk().bodyJson().isLenientlyEqualTo("""
                 {"code": "AV-01", "type": "STANDARD", "state": "INACTIVE", "storeId": 1}
                 """);
-        then(scooterActivation).should().deactivate("AV-01");
+        then(changeScooterState).should().deactivate("AV-01");
     }
 
     @Test
     void whenStateChangeIsRefused_thenConflict() {
-        given(scooterActivation.deactivate("AV-01")).willThrow(new ScooterStateChangeRefusedException(
+        given(changeScooterState.deactivate("AV-01")).willThrow(new ScooterStateChangeRefusedException(
                 "AV-01", ScooterState.IN_USE, ScooterState.INACTIVE));
 
         MvcTestResult result = patch("AV-01", """
@@ -255,9 +257,23 @@ class ScooterControllerTest {
                 .isEqualTo("Scooter AV-01 cannot go from IN_USE to INACTIVE");
     }
 
+    /** Another change holds the scooter's lock for longer than the lock timeout. */
+    @Test
+    void whenScooterToDeactivateIsLockedByAnotherChange_thenConflict() {
+        given(changeScooterState.deactivate("AV-01"))
+                .willThrow(new CannotAcquireLockException("lock timeout"));
+
+        MvcTestResult result = patch("AV-01", """
+                {"state": "INACTIVE"}
+                """);
+
+        assertThat(result).hasStatus(HttpStatus.CONFLICT)
+                .hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
+    }
+
     @Test
     void whenScooterToChangeDoesNotExist_thenNotFound() {
-        given(scooterActivation.activate("XX-99")).willThrow(new ScooterNotFoundException("XX-99"));
+        given(changeScooterState.activate("XX-99")).willThrow(new ScooterNotFoundException("XX-99"));
 
         MvcTestResult result = patch("XX-99", """
                 {"state": "AVAILABLE"}
@@ -279,7 +295,10 @@ class ScooterControllerTest {
                 """));
     }
 
-    /** The other states are reached through bookings and maintenance, not set by the operator. */
+    /**
+     * Reserved, in use and maintenance are reached through bookings and maintenance; retired only
+     * when the operator retires an inactive scooter (HE-37; Product Specification, 3.3).
+     */
     @ParameterizedTest
     @ValueSource(strings = {"RESERVED", "IN_USE", "MAINTENANCE", "RETIRED"})
     void whenOperatorSetsAStateOtherThanAvailableOrInactive_thenBadRequest(String state) {

@@ -5,7 +5,7 @@ import pt.ua.hipereats.domain.fleet.ScooterNotFoundException;
 import pt.ua.hipereats.domain.fleet.ScooterStateChangeRefusedException;
 
 /** Inbound port: the operator activates and deactivates a scooter (HE-30). */
-public interface ScooterActivationUseCase {
+public interface ChangeScooterStateUseCase {
 
     /**
      * Makes an inactive scooter available.
