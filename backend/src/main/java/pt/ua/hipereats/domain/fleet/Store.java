@@ -8,8 +8,15 @@ package pt.ua.hipereats.domain.fleet;
  */
 public record Store(long id, int fleetCapacity, int scooterCount) {
 
-    /** Registers a new scooter in this store's fleet. */
+    /**
+     * Registers a new scooter in this store's fleet. The scooter starts inactive.
+     *
+     * @throws StoreAtCapacityException if the store already holds its fleet capacity (BR13)
+     */
     public Scooter registerScooter(String code, ScooterType type) {
-        throw new UnsupportedOperationException("HE-29: not implemented yet");
+        if (scooterCount >= fleetCapacity) {
+            throw new StoreAtCapacityException(id, fleetCapacity);
+        }
+        return new Scooter(code, type, ScooterState.INACTIVE, id);
     }
 }
