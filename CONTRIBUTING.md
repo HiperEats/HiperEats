@@ -71,6 +71,37 @@ If you changed only documentation (Markdown files or images), you do not need to
 
 Reports: `backend/target/surefire-reports/` (unit), `backend/target/failsafe-reports/` (integration), `backend/target/cucumber/cucumber.html` (acceptance) and `backend/target/site/jacoco/index.html` (coverage). Without `clean`, the coverage of earlier runs is added to the report.
 
+## Work process
+
+The short version of how the team works; the QA Manual (sections 2 and 4.1) has the full one, and the two must agree.
+
+### Iterations
+
+- Five one-week iterations, from Friday to Friday. Each one starts at the checkpoint in the Práticas class (P4, Fridays), where we show the outcomes of the one that ends.
+- **Kick-off meeting**, on the checkpoint day: we record the professor's feedback, plan the iteration (sprint planning) and create its sprint in Jira with the stories and tasks we commit to. Each member takes stories and tasks of their own.
+- **Grooming:** the Product Owner writes and refines the stories of the next iteration; the team reviews them, estimates their story points and checks the definition of ready before they enter a sprint.
+- **Team meetings:** one or two a week. The minutes are in [docs/Minutes](docs/Minutes), one file per meeting (`minutes-YYYY-MM-DD-<topic>.md`), with the decisions, who does what, and the open questions.
+- **End of the iteration:** everything for the checkpoint is merged into `dev`, `dev` goes to `main` through a pull request, the reports are exported as PDF to `docs/`, and `main` is tagged `iter<n>` (`iter1`, `iter2`, ...). The burndown and velocity charts of the sprint are in Jira (Reports).
+
+### From the backlog to done
+
+1. Grooming: the story meets the [definition of ready](#definition-of-ready) and enters the sprint at sprint planning. Jira: **To Do**.
+2. A member takes it, creates its branch and writes the tests first, where the team applies TDD (see [Workflow](#workflow) and [Tests](#tests)). Jira: **In Progress**.
+3. Pull request to `dev`, with the template filled in. CI runs the build, the tests and the SonarCloud quality gate; Claude reviews it, and another member reviews it (see [Reviews](#reviews)). Jira: **In Review**.
+4. Approval, every conversation resolved and the required checks green; the author merges (see [Merge rules](#merge-rules)). On `dev`, CI imports the test results into Xray, where the story shows its coverage (HE-41).
+5. The story meets the [definition of done](#definition-of-done) and the Product Owner accepts it. Jira: **Done**.
+
+### Roles
+
+Everyone develops: implements and tests stories, with their own pull requests and commits. On top of that:
+
+| Role | Who | Does |
+|---|---|---|
+| Team Coordinator | Daniel Rodrigues | Distributes the tasks fairly and checks that the team follows the plan; acts early on problems; makes sure the outcomes are delivered on time |
+| Product Owner | Martim Travesso | Represents the client and knows the domain; writes and refines the stories and the Product Specification; clarifies features for the team; accepts the story increments |
+| QA Engineer | André Martins | Promotes the QA practices with the other roles; sets up the tools that measure quality (quality gate, Xray, dependency scanning, AI review); checks that the team follows the agreed practices, including the AI rules |
+| DevOps Master | André Martins | Owns the development and production infrastructure: repository and its rules, CI/CD pipelines, containers, deployment environment, databases |
+
 ## Workflow
 
 We follow GitHub flow with an integration branch, `dev`. Every change reaches `dev` through a pull request, and `main` receives changes only through a pull request from `dev`. Both branches are protected, and `main` is always deployable.
