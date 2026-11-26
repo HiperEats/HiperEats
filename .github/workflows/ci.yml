@@ -1,9 +1,11 @@
 name: CI
 
-# Build and test every part of the project on every push and pull request, and analyse the
-# backend with SonarCloud on every pull request and on every push to dev and main.
+# Build and test every part of the project on every pull request and on every push to dev and
+# main, and analyse the backend with SonarCloud on the same events. Feature branches run CI in
+# their pull request only, so each commit of a pull request runs once.
 on:
   push:
+    branches: [dev, main]
   pull_request:
   workflow_dispatch:
 
@@ -38,7 +40,7 @@ jobs:
         run: ./mvnw -B -ntp verify
 
       # Compiled classes, test results and coverage, so that SonarCloud does not build and test again.
-      # Same condition as the quality-gate job: other pushes have no analysis to feed.
+      # Same condition as the quality-gate job: a manual run on another branch has no analysis to feed.
       - name: Upload build for SonarCloud
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v7
@@ -124,8 +126,8 @@ jobs:
         run: npm run build
 
   # The ruleset of dev and main requires "Quality gate (SonarCloud)". Only pull request runs have
-  # that name: the push run of the same commit must never report a result under the required name.
-  # A feature branch is analysed once, in its pull request. dev and main are analysed on push
+  # that name: the push run of a merge to dev or main must never report a result under the required
+  # name. A feature branch is analysed once, in its pull request. dev and main are analysed on push
   # because SonarCloud compares each pull request with the last analysis of its target branch.
   quality-gate:
     name: ${{ github.event_name == 'pull_request' && 'Quality gate (SonarCloud)' || 'SonarCloud analysis of the branch' }}
