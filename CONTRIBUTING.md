@@ -23,11 +23,11 @@ You need Git, **Java 21**, **Node 22** (22.22.2 or newer, with npm) and **Docker
 ```bash
 git clone https://github.com/HiperEats/HiperEats.git
 cd HiperEats
-cp .env.example .env      # once; then set your own POSTGRES_PASSWORD in .env
+cp .env.example .env      # once; then set your own POSTGRES_PASSWORD and JWT_SECRET in .env
 docker compose up --build
 ```
 
-`.env` holds the database credentials and is never committed. Every `docker compose` command needs it.
+`.env` holds the database credentials and the secret that signs the access tokens, and is never committed. Every `docker compose` command needs it.
 
 Open <http://localhost:3000>: the page shows the status of the backend. The backend answers on <http://localhost:8080/api/status>, PostgreSQL listens on `localhost:5432` (this machine only) and the MQTT broker on port 1883. Stop everything with `docker compose down`; the database data stays in the `db-data` volume, and `docker compose down -v` erases it.
 
@@ -46,6 +46,7 @@ To work on one part without rebuilding the containers, run the backend and the f
 | `address already in use` (Docker) or `Port 8080 was already in use` (backend) | Another program uses the port. Run `docker compose down`, or stop the program that uses 8080, 3000, 5432 or 1883. |
 | `Cannot connect to the Docker daemon` | Docker is not running. Start it and try again. |
 | `required variable POSTGRES_PASSWORD is missing a value` | There is no `.env`. Run `cp .env.example .env` and set a password. |
+| `required variable JWT_SECRET is missing a value`, or the backend stops with `Set JWT_SECRET` | `.env` has no `JWT_SECRET`, or it is shorter than 32 characters. Add one, for example the output of `openssl rand -base64 48`. |
 | `password authentication failed for user` | The password in `.env` changed after the database was created. Run `docker compose down -v` (erases the local data) and start again. |
 | Integration tests fail with `Could not find a valid Docker environment` | Testcontainers needs Docker running for `./mvnw verify`. |
 | `release version 21 not supported` | Maven runs with an older Java. Check it with `./mvnw -version` and point `JAVA_HOME` to Java 21. |
