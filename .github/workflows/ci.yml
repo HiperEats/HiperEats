@@ -213,7 +213,6 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           : "${SONAR_TOKEN:?The SONAR_TOKEN secret is missing}"
-<<<<<<< HEAD
           ./mvnw -B -ntp org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
             -Dsonar.qualitygate.wait=${{ github.event_name == 'pull_request' }}
 
@@ -302,8 +301,6 @@ jobs:
           skip-dirs: .cache
           ignore-unfixed: true
           exit-code: "1"
-=======
-          ./mvnw -B -ntp sonar:sonar -Dsonar.qualitygate.wait=${{ github.event_name == 'pull_request' }}
 
   # Xray traceability (HE-41): the backend tests linked to a story (@Requirement, or the @HE-n tag
   # of a Gherkin feature) become one Test Execution in Xray, in the Test Plan of the current
@@ -384,4 +381,3 @@ jobs:
       - name: Explain the missing reports
         if: steps.download.outcome != 'success'
         run: echo "::notice::No test reports from the backend job (most likely it failed before its tests ran), so nothing was imported into Xray."
->>>>>>> origin/dev
