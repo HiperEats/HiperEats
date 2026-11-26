@@ -124,9 +124,10 @@ pt.ua.hipereats/
 - Never push to `dev` or `main` and never merge. A human reviews and approves every pull request.
 - Fill in the pull request template, including the **AI use** section: what was produced by an agent, and which AI review findings were accepted or rejected.
 
-## 11. Definition of done
+## 11. Definition of ready and definition of done
 
-See the definition of done in `CONTRIBUTING.md`.
+- Before you start a story or task, check that it meets the definition of ready in `CONTRIBUTING.md`. If it does not, do not start: tell the human what is missing (for example acceptance criteria, BR references or Gherkin scenarios).
+- See the definition of done in `CONTRIBUTING.md`.
 
 ## 12. Build and test commands
 
