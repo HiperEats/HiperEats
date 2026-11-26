@@ -71,6 +71,39 @@ If you changed only documentation (Markdown files or images), you do not need to
 
 Reports: `backend/target/surefire-reports/` (unit), `backend/target/failsafe-reports/` (integration), `backend/target/cucumber/cucumber.html` (acceptance), `backend/target/site/jacoco/index.html` (coverage) and `backend/target/xray/` (the reports for Xray). Without `clean`, the coverage of earlier runs is added to the report.
 
+## Work process
+
+The short version of how the team works; the QA Manual (HE-42) will have the full one, and the two must agree.
+
+### Iterations
+
+- Five one-week iterations, from Friday to Friday. Each one starts at the checkpoint in the practical class (P4, Fridays), where we show the outcomes of the one that ends.
+- **Kick-off meeting**, on the checkpoint day: we record the professor's feedback, plan the iteration (sprint planning) and create its sprint in Jira with the stories and tasks we commit to. Each member takes stories and tasks of their own.
+- **Grooming:** the Product Owner writes and refines the stories of the next iteration; the team reviews them, estimates their story points and checks the definition of ready before they enter a sprint.
+- **Team meetings:** one or two a week. The minutes are in [docs/Minutes](docs/Minutes), one file per meeting (`minutes-YYYY-MM-DD[-<topic>].md`, the topic is optional), with the decisions, who does what, and the open questions.
+- **End of the iteration:** everything for the checkpoint is merged into `dev`, `dev` goes to `main` through a pull request **(proposal)**, the reports are exported as PDF to `docs/`, and `main` is tagged `iter<n>` (`iter1`, `iter2`, ...). The final presentation (18 Dec) is tagged `v1.0`. The burndown and velocity charts of the sprint are in Jira (Reports).
+
+### From the backlog to done
+
+1. Grooming: the story meets the [definition of ready](#definition-of-ready) and enters the sprint at sprint planning. Jira: **To Do**.
+2. A member takes it, creates its branch and writes the tests first, at least for the business rules (see [Workflow](#workflow) and [Tests](#tests)). Jira: **In Progress**.
+3. Pull request to `dev`, with the template filled in. CI runs the build, the tests and the SonarCloud quality gate; Claude reviews it, and another member reviews it (see [Reviews](#reviews)). Jira: **In Review**.
+4. Approval, every conversation resolved and the required checks green; the author merges (see [Merge rules](#merge-rules)). On `dev`, CI imports the test results into Xray, where the story shows its coverage (HE-41).
+5. The story meets the [definition of done](#definition-of-done) and the Product Owner accepts it. Jira: **Done**.
+
+### Roles
+
+Everyone develops: implements and tests stories, with their own pull requests and commits. On top of that, each member holds one or more roles (who holds each one is in the [README](README.md#project-team)):
+
+| Role | Does |
+|---|---|
+| Team Coordinator | Distributes the tasks fairly and checks that the team follows the plan; acts early on problems; makes sure the outcomes are delivered on time |
+| Product Owner | Represents the client and knows the domain; writes and refines the stories and the Product Specification; clarifies features for the team; accepts the story increments |
+| QA Engineer | Promotes the QA practices with the other roles; makes sure the tools that measure quality are in place (quality gate, Xray, dependency scanning, AI review); checks that the team follows the agreed practices, including the AI rules |
+| DevOps Master | Makes sure the development and production infrastructure is in place: repository and its rules, CI/CD pipelines, containers, deployment environment, databases |
+
+A role answers for an area; the tasks themselves are distributed among everyone at the kick-off meeting. For example, the quality gate (HE-40) is Daniel's (decision 5 of the [minutes of 20 Nov](docs/Minutes/minutes-2026-11-20-i2-kickoff.md)).
+
 ## Workflow
 
 We follow GitHub flow with an integration branch, `dev`. Every change reaches `dev` through a pull request, and `main` receives changes only through a pull request from `dev`. Both branches are protected, and `main` is always deployable.
@@ -90,7 +123,7 @@ We follow GitHub flow with an integration branch, `dev`. Every change reaches `d
 5. Run the tests and push: `git push -u origin HE-12-booking-endpoint`.
 6. Open a pull request to `dev` whose title starts with the story key (`HE-12 Add booking endpoint`), fill in the template and move the story to **In Review**. One story per pull request.
 7. Answer the review. CI runs the build and the tests, and Claude reviews the pull request. Record in the template which of its findings you accepted or rejected, and why.
-8. At least one other member approves and CI passes. The author merges and moves the story to **Done**.
+8. At least one other member approves and CI passes. The author merges. The story moves to **Done** once it meets the [definition of done](#definition-of-done) and the Product Owner accepts it.
 
 Agents never merge. A human approves every pull request.
 
