@@ -16,6 +16,7 @@ import pt.ua.hipereats.application.port.in.RegisterScooterUseCase;
 import pt.ua.hipereats.application.port.in.RetireScooterUseCase;
 import pt.ua.hipereats.application.port.in.ScooterQuery;
 import pt.ua.hipereats.domain.fleet.Scooter;
+import pt.ua.hipereats.domain.fleet.ScooterNotFoundException;
 
 /**
  * REST resource of the fleet's scooters.
@@ -52,8 +53,7 @@ public class ScooterController {
     public ScooterResponse find(@PathVariable String code) {
         return scooterQuery.findByCode(code)
                 .map(ScooterResponse::from)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Scooter " + code + " does not exist"));
+                .orElseThrow(() -> new ScooterNotFoundException(code));
     }
 
     /**
