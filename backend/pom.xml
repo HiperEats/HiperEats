@@ -100,6 +100,14 @@
 			<artifactId>spring-boot-starter-security-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- Xray traceability (HE-41): @Requirement links a JUnit test to its story, and the listener
+		     writes a JUnit XML report with the story keys that CI imports into Xray. -->
+		<dependency>
+			<groupId>app.getxray</groupId>
+			<artifactId>xray-junit-extensions</artifactId>
+			<version>1.1.0</version>
+			<scope>test</scope>
+		</dependency>
 		<!-- Integration tests against a real PostgreSQL in Docker (Testcontainers 2, as in TP03). -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
