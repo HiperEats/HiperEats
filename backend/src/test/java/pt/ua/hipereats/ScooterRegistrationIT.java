@@ -2,6 +2,7 @@ package pt.ua.hipereats;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import app.getxray.xray.junit.customjunitxml.annotations.Requirement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -51,6 +52,7 @@ class ScooterRegistrationIT {
     }
 
     @Test
+    @Requirement("HE-29")
     void whenScooterIsRegistered_thenItIsStoredInactiveAtThatStore() {
         long storeId = data.createStore(10);
         String code = FleetTestData.uniqueCode();
@@ -69,6 +71,7 @@ class ScooterRegistrationIT {
     }
 
     @Test
+    @Requirement("HE-29")
     void whenCodeIsAlreadyUsedAtAnotherStore_thenConflictAndNothingIsStored() {
         long firstStore = data.createStore(10);
         long secondStore = data.createStore(10);
@@ -81,6 +84,7 @@ class ScooterRegistrationIT {
     }
 
     @Test
+    @Requirement("HE-29")
     void whenStoreDoesNotExist_thenNotFoundAndNothingIsStored() {
         String code = FleetTestData.uniqueCode();
 
@@ -91,6 +95,7 @@ class ScooterRegistrationIT {
     }
 
     @Test
+    @Requirement("HE-29")
     @DisplayName("BR13: of concurrent registrations for the last free place, only one is accepted")
     void whenRegistrationsRaceForTheLastFreePlace_thenOnlyOneIsAccepted() throws Exception {
         long storeId = data.createStore(10);
