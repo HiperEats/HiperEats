@@ -77,7 +77,7 @@ We follow GitHub flow with an integration branch, `dev`. Every change reaches `d
 
 `dev` goes to `main` at the end of each iteration, with CI passing **(proposal)**.
 
-1. Pick a story or task from the current sprint in Jira (see [Stories](#stories)) and move it to **In Progress**.
+1. Pick a story or task from the current sprint in Jira that meets the [definition of ready](#definition-of-ready) (see [Stories](#stories)) and move it to **In Progress**.
 2. Create a branch from an up-to-date `dev`, named after the story key: `HE-<n>-short-description` (for example `HE-12-booking-endpoint`).
 
    ```bash
@@ -150,6 +150,23 @@ AI tools are welcome; the responsibility stays with the person who opens the pul
 - The same rules apply to all code, including the tests and the review.
 - Give agents [AGENTS.md](AGENTS.md) before they change anything.
 - In the **AI use** section of the pull request, say what was produced with AI, and which Claude review findings you accepted or rejected and why.
+
+## Definition of ready
+
+A story is ready, and may enter a sprint at sprint planning, when:
+
+- it follows the [story format](#stories) and has a few acceptance criteria that bound it;
+- if it applies business rules, they are referenced by their ID (`BR<n>`) and section 3.2 of the Product Specification gives the values it needs; if a value is missing, ask the Product Owner;
+- if it is a core story, its Gherkin scenarios are written and reviewed, tagged with the story (`@HE-<n>`) and the rules (`@BR<n>`): either already in `backend/src/test/resources/features`, still `@wip`, or in the Jira story, to become the first commit of its pull request, tagged `@wip`;
+- its dependencies on other stories are identified and linked in Jira ("is blocked by"), and none of them blocks it now, or the team agreed a workaround, noted in the Jira story and repeated in the pull request;
+- the Product Owner and the team have reviewed it at grooming or sprint planning;
+- it has story points on the Fibonacci scale, agreed by the team.
+
+Core stories are the user stories of the mandatory MVP. Tasks and the extensions (geofencing and predictive maintenance) are not core stories **(proposal)**.
+
+A task (for example of the *Platform and quality* epic) is ready when it has a clear goal, acceptance criteria and its dependencies identified.
+
+If a story or task you pick is not ready, do not start it: ask the Product Owner, and complete it or pick another one.
 
 ## Definition of done
 
