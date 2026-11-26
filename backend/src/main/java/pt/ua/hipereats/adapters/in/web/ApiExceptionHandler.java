@@ -6,6 +6,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import pt.ua.hipereats.domain.fleet.ScooterCodeAlreadyUsedException;
+import pt.ua.hipereats.domain.fleet.ScooterNotFoundException;
+import pt.ua.hipereats.domain.fleet.ScooterStateChangeRefusedException;
 import pt.ua.hipereats.domain.fleet.StoreAtCapacityException;
 import pt.ua.hipereats.domain.fleet.StoreNotFoundException;
 
@@ -37,6 +39,20 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     ProblemDetail scooterCodeAlreadyUsed(ScooterCodeAlreadyUsedException e) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
         problem.setTitle("Scooter code already used");
+        return problem;
+    }
+
+    @ExceptionHandler(ScooterNotFoundException.class)
+    ProblemDetail scooterNotFound(ScooterNotFoundException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+        problem.setTitle("Scooter not found");
+        return problem;
+    }
+
+    @ExceptionHandler(ScooterStateChangeRefusedException.class)
+    ProblemDetail scooterStateChangeRefused(ScooterStateChangeRefusedException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+        problem.setTitle("Scooter state change refused");
         return problem;
     }
 }
