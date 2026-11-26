@@ -1,8 +1,11 @@
 name: CI
 
-# Build and test every part of the project on every push and pull request.
+# Build and test every part of the project on every pull request and on every push to dev and
+# main, and analyse the backend with SonarCloud on the same events. Feature branches run CI in
+# their pull request only, so each commit of a pull request runs once.
 on:
   push:
+    branches: [dev, main]
   pull_request:
   workflow_dispatch:
 
@@ -35,6 +38,22 @@ jobs:
       # Unit tests (*Test, Surefire), integration tests (*IT, Failsafe) and packaging.
       - name: Build and test
         run: ./mvnw -B -ntp verify
+
+      # Compiled classes, test results and coverage, so that SonarCloud does not build and test again.
+      # Same condition as the quality-gate job: a manual run on another branch has no analysis to feed.
+      - name: Upload build for SonarCloud
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-sonar
+          path: |
+            backend/target/classes/
+            backend/target/test-classes/
+            backend/target/surefire-reports/
+            backend/target/failsafe-reports/
+            backend/target/site/jacoco/
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Upload test reports
         if: always()
@@ -105,6 +124,75 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # The ruleset of dev and main requires "Quality gate (SonarCloud)". Only pull request runs have
+  # that name: the push run of a merge to dev or main must never report a result under the required
+  # name. A feature branch is analysed once, in its pull request. dev and main are analysed on push
+  # because SonarCloud compares each pull request with the last analysis of its target branch.
+  quality-gate:
+    name: ${{ github.event_name == 'pull_request' && 'Quality gate (SonarCloud)' || 'SonarCloud analysis of the branch' }}
+    needs: backend
+    # !cancelled(): without it a failing backend job skips this job, and a skipped job counts as
+    # passed on a required check. The first step fails it instead.
+    if: ${{ !cancelled() && (github.event_name == 'pull_request' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # GitHub gives no secrets to pull requests from Dependabot or from forks. Without this they
+      # would fail for good on a required check; the push to dev analyses them after the merge.
+      HAS_SECRETS: ${{ github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    steps:
+      - name: Fail when the backend job did not pass
+        if: needs.backend.result != 'success'
+        run: |
+          echo "::error::The backend job did not pass (${{ needs.backend.result }}), so there is no build to analyse."
+          exit 1
+
+      - name: Explain the skipped analysis
+        if: env.HAS_SECRETS != 'true'
+        run: echo "::notice::SonarCloud analysis skipped, GitHub gives no secrets to this pull request."
+
+      - uses: actions/checkout@v7
+        if: env.HAS_SECRETS == 'true'
+        with:
+          # SonarCloud needs the history to find the new code.
+          fetch-depth: 0
+
+      - name: Set up Java 21
+        if: env.HAS_SECRETS == 'true'
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Download the backend build
+        if: env.HAS_SECRETS == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: backend-sonar
+          path: backend/target
+
+      # The analyzers SonarCloud downloads; the Maven cache of the backend job does not keep them.
+      - name: Cache the SonarCloud analyzers
+        if: env.HAS_SECRETS == 'true'
+        uses: actions/cache@v6
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      # In a pull request, waits for the quality gate (up to 5 minutes) and fails when it fails.
+      # Not on dev and main: the gate of a branch is not computed in its first analysis.
+      - name: SonarCloud analysis and quality gate
+        if: env.HAS_SECRETS == 'true'
+        working-directory: backend
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          : "${SONAR_TOKEN:?The SONAR_TOKEN secret is missing}"
+          ./mvnw -B -ntp sonar:sonar -Dsonar.qualitygate.wait=${{ github.event_name == 'pull_request' }}
 
   dependencies:
     name: Dependencies (vulnerability scan)
