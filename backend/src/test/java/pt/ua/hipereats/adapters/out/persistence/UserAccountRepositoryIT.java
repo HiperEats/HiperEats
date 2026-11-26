@@ -46,6 +46,15 @@ class UserAccountRepositoryIT {
     }
 
     @Test
+    void whenAccountIsDeactivated_thenTheChangeIsStored() {
+        UserAccount rita = accounts.save(UserAccount.newAccount("rita@example.test", "{noop}x", Role.COURIER));
+
+        accounts.save(rita.withActive(false));
+
+        assertThat(accounts.findById(rita.id())).get().extracting(UserAccount::active).isEqualTo(false);
+    }
+
+    @Test
     void whenEmailIsUnknown_thenNothingIsFound() {
         assertThat(accounts.findByEmail("nobody@example.test")).isEmpty();
     }

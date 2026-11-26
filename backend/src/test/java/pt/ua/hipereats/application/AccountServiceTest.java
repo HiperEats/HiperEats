@@ -30,9 +30,18 @@ class AccountServiceTest {
         }
 
         @Override
+        public Optional<UserAccount> findById(long id) {
+            return accounts.stream().filter(a -> a.id() == id).findFirst();
+        }
+
+        @Override
         public UserAccount save(UserAccount account) {
+            if (account.id() != null) {
+                accounts.replaceAll(a -> a.id().equals(account.id()) ? account : a);
+                return account;
+            }
             UserAccount saved = new UserAccount((long) accounts.size() + 1, account.email(),
-                    account.passwordHash(), account.role());
+                    account.passwordHash(), account.role(), account.active());
             accounts.add(saved);
             return saved;
         }
@@ -67,8 +76,8 @@ class AccountServiceTest {
     private final FakeAccounts accounts = new FakeAccounts();
     private final AccountService service = new AccountService(accounts, new FakeHasher(), new FakeTokens());
 
-    private void givenAccount(String email, String password, Role role) {
-        accounts.save(UserAccount.newAccount(email, "hashed:" + password, role));
+    private UserAccount givenAccount(String email, String password, Role role) {
+        return accounts.save(UserAccount.newAccount(email, "hashed:" + password, role));
     }
 
     @Test
@@ -114,6 +123,72 @@ class AccountServiceTest {
         assertThatThrownBy(() -> service.logIn(null, "Secret-123")).isInstanceOf(InvalidCredentialsException.class);
         assertThatThrownBy(() -> service.logIn("rita@example.test", null))
                 .isInstanceOf(InvalidCredentialsException.class);
+    }
+
+    @Test
+    void whenAdminDeactivatesAnAccount_thenItIsSavedAsInactive() {
+        givenAccount("sofia@example.test", "Secret-456", Role.ADMIN);
+        UserAccount rita = givenAccount("rita@example.test", "Secret-123", Role.COURIER);
+
+        UserAccount result = service.setActive(rita.id(), false, "sofia@example.test");
+
+        assertThat(result.active()).isFalse();
+        assertThat(accounts.findByEmail("rita@example.test")).get().extracting(UserAccount::active).isEqualTo(false);
+    }
+
+    @Test
+    void whenAccountIsDeactivated_thenItCannotLogInEvenWithTheRightPassword() {
+        UserAccount rita = givenAccount("rita@example.test", "Secret-123", Role.COURIER);
+        service.setActive(rita.id(), false, "sofia@example.test");
+
+        assertThatThrownBy(() -> service.logIn("rita@example.test", "Secret-123"))
+                .isInstanceOf(AccountDeactivatedException.class);
+    }
+
+    @Test
+    void whenDeactivatedAccountIsReactivated_thenItCanLogInAgain() {
+        UserAccount rita = givenAccount("rita@example.test", "Secret-123", Role.COURIER);
+        service.setActive(rita.id(), false, "sofia@example.test");
+
+        service.setActive(rita.id(), true, "sofia@example.test");
+
+        assertThat(service.logIn("rita@example.test", "Secret-123").role()).isEqualTo(Role.COURIER);
+    }
+
+    @Test
+    void whenDeactivatedAccountTriesAWrongPassword_thenTheAnswerIsTheUsualWrongPassword() {
+        UserAccount rita = givenAccount("rita@example.test", "Secret-123", Role.COURIER);
+        service.setActive(rita.id(), false, "sofia@example.test");
+
+        // Saying "deactivated" only to whoever knows the password reveals nothing new.
+        assertThatThrownBy(() -> service.logIn("rita@example.test", "wrong-password"))
+                .isInstanceOf(InvalidCredentialsException.class);
+    }
+
+    @Test
+    void whenAdminTriesToDeactivateTheirOwnAccount_thenItIsRefused() {
+        UserAccount sofia = givenAccount("sofia@example.test", "Secret-456", Role.ADMIN);
+
+        assertThatThrownBy(() -> service.setActive(sofia.id(), false, "sofia@example.test"))
+                .isInstanceOf(CannotDeactivateOwnAccountException.class);
+        assertThat(accounts.findByEmail("sofia@example.test")).get().extracting(UserAccount::active).isEqualTo(true);
+    }
+
+    @Test
+    void whenAccountDoesNotExist_thenDeactivatingItFailsAsNotFound() {
+        assertThatThrownBy(() -> service.setActive(99, false, "sofia@example.test"))
+                .isInstanceOf(AccountNotFoundException.class);
+    }
+
+    @Test
+    void whenAccountIsActiveOrNot_thenTheStatusQueryTellsIt() {
+        UserAccount rita = givenAccount("rita@example.test", "Secret-123", Role.COURIER);
+        assertThat(service.isActive("rita@example.test")).isTrue();
+
+        service.setActive(rita.id(), false, "sofia@example.test");
+
+        assertThat(service.isActive("rita@example.test")).isFalse();
+        assertThat(service.isActive("nobody@example.test")).isFalse();
     }
 
     @Test

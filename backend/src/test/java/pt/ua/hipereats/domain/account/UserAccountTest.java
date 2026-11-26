@@ -33,6 +33,21 @@ class UserAccountTest {
     }
 
     @Test
+    void whenAccountIsCreated_thenItIsActive() {
+        assertThat(UserAccount.newAccount("rita@example.test", HASH, Role.COURIER).active()).isTrue();
+    }
+
+    @Test
+    void whenAccountIsDeactivated_thenOnlyItsStatusChanges() {
+        UserAccount rita = new UserAccount(7L, "rita@example.test", HASH, Role.COURIER, true);
+
+        UserAccount deactivated = rita.withActive(false);
+
+        assertThat(deactivated.active()).isFalse();
+        assertThat(deactivated).usingRecursiveComparison().ignoringFields("active").isEqualTo(rita);
+    }
+
+    @Test
     void whenAccountIsPrinted_thenThePasswordHashIsHidden() {
         UserAccount account = UserAccount.newAccount("rita@example.test", HASH, Role.COURIER);
 
