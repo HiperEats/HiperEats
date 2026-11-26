@@ -185,6 +185,9 @@ jobs:
 
       # In a pull request, waits for the quality gate (up to 5 minutes) and fails when it fails.
       # Not on dev and main: the gate of a branch is not computed in its first analysis.
+      # The plugin is named by groupId:artifactId (version from pluginManagement in pom.xml), not by
+      # the prefix "sonar:": resolving a prefix downloads the plugin-group metadata from Maven
+      # Central, which answers HTTP 429 under load and fails with "No plugin found for prefix".
       - name: SonarCloud analysis and quality gate
         if: env.HAS_SECRETS == 'true'
         working-directory: backend
@@ -192,7 +195,8 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           : "${SONAR_TOKEN:?The SONAR_TOKEN secret is missing}"
-          ./mvnw -B -ntp sonar:sonar -Dsonar.qualitygate.wait=${{ github.event_name == 'pull_request' }}
+          ./mvnw -B -ntp org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+            -Dsonar.qualitygate.wait=${{ github.event_name == 'pull_request' }}
 
   dependencies:
     name: Dependencies (vulnerability scan)
