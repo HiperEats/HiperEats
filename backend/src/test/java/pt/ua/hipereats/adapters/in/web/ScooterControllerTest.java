@@ -21,10 +21,13 @@ import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import pt.ua.hipereats.application.port.in.RegisterScooterCommand;
 import pt.ua.hipereats.application.port.in.RegisterScooterUseCase;
+import pt.ua.hipereats.application.port.in.RetireScooterUseCase;
 import pt.ua.hipereats.application.port.in.ScooterQuery;
 import pt.ua.hipereats.domain.fleet.Scooter;
 import pt.ua.hipereats.domain.fleet.ScooterCodeAlreadyUsedException;
+import pt.ua.hipereats.domain.fleet.ScooterNotFoundException;
 import pt.ua.hipereats.domain.fleet.ScooterState;
+import pt.ua.hipereats.domain.fleet.ScooterStateChangeRefusedException;
 import pt.ua.hipereats.domain.fleet.ScooterType;
 import pt.ua.hipereats.domain.fleet.StoreAtCapacityException;
 import pt.ua.hipereats.domain.fleet.StoreNotFoundException;
@@ -44,6 +47,9 @@ class ScooterControllerTest {
 
     @MockitoBean
     private ScooterQuery scooterQuery;
+
+    @MockitoBean
+    private RetireScooterUseCase retireScooter;
 
     private MvcTestResult post(String json) {
         return mvc.post().uri("/api/v1/scooters")
@@ -187,5 +193,66 @@ class ScooterControllerTest {
         assertThat(result).hasStatus(HttpStatus.NOT_FOUND)
                 .hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
         then(scooterQuery).should().findByCode("XX-99");
+    }
+
+    private MvcTestResult patch(String code, String json) {
+        return mvc.patch().uri("/api/v1/scooters/{code}", code)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json)
+                .exchange();
+    }
+
+    @Test
+    void whenOperatorSetsTheStateToRetired_thenTheScooterIsRetired() {
+        given(retireScooter.retire("AV-01")).willReturn(
+                new Scooter("AV-01", ScooterType.STANDARD, ScooterState.RETIRED, 1L));
+
+        MvcTestResult result = patch("AV-01", """
+                {"state": "RETIRED"}
+                """);
+
+        assertThat(result).hasStatusOk().bodyJson().isLenientlyEqualTo("""
+                {"code": "AV-01", "type": "STANDARD", "state": "RETIRED", "storeId": 1}
+                """);
+        then(retireScooter).should().retire("AV-01");
+    }
+
+    @Test
+    void whenRetirementIsRefused_thenConflict() {
+        given(retireScooter.retire("AV-01")).willThrow(new ScooterStateChangeRefusedException(
+                "AV-01", ScooterState.AVAILABLE, ScooterState.RETIRED));
+
+        MvcTestResult result = patch("AV-01", """
+                {"state": "RETIRED"}
+                """);
+
+        assertThat(result).hasStatus(HttpStatus.CONFLICT)
+                .hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
+        assertThat(result).bodyJson().extractingPath("$.detail")
+                .isEqualTo("Scooter AV-01 cannot go from AVAILABLE to RETIRED");
+    }
+
+    @Test
+    void whenScooterToRetireDoesNotExist_thenNotFound() {
+        given(retireScooter.retire("XX-99")).willThrow(new ScooterNotFoundException("XX-99"));
+
+        MvcTestResult result = patch("XX-99", """
+                {"state": "RETIRED"}
+                """);
+
+        assertThat(result).hasStatus(HttpStatus.NOT_FOUND)
+                .hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
+    }
+
+    /** RESERVED is reached through bookings, never set by the operator. */
+    @Test
+    void whenOperatorSetsAStateReachedThroughBookings_thenBadRequestAndNothingIsRetired() {
+        MvcTestResult result = patch("AV-01", """
+                {"state": "RESERVED"}
+                """);
+
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST)
+                .hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
+        then(retireScooter).should(never()).retire(any());
     }
 }

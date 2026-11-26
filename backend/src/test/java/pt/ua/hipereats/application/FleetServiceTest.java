@@ -14,7 +14,9 @@ import pt.ua.hipereats.application.port.in.RegisterScooterCommand;
 import pt.ua.hipereats.application.port.out.ScooterRepository;
 import pt.ua.hipereats.application.port.out.StoreRepository;
 import pt.ua.hipereats.domain.fleet.Scooter;
+import pt.ua.hipereats.domain.fleet.ScooterNotFoundException;
 import pt.ua.hipereats.domain.fleet.ScooterState;
+import pt.ua.hipereats.domain.fleet.ScooterStateChangeRefusedException;
 import pt.ua.hipereats.domain.fleet.ScooterType;
 import pt.ua.hipereats.domain.fleet.Store;
 import pt.ua.hipereats.domain.fleet.StoreAtCapacityException;
@@ -43,6 +45,24 @@ class FleetServiceTest {
         @Override
         public Optional<Scooter> findByCode(String code) {
             return added.stream().filter(s -> s.code().equals(code)).findFirst();
+        }
+
+        @Override
+        public Optional<Scooter> findAndLock(String code) {
+            return findByCode(code);
+        }
+
+        @Override
+        public void update(Scooter scooter) {
+            added.replaceAll(s -> s.code().equals(scooter.code()) ? scooter : s);
+        }
+
+        void put(String code, ScooterState state) {
+            added.add(new Scooter(code, ScooterType.STANDARD, state, 1L));
+        }
+
+        ScooterState stateOf(String code) {
+            return findByCode(code).orElseThrow().state();
         }
     }
 
@@ -93,5 +113,39 @@ class FleetServiceTest {
         Optional<Scooter> found = service.findByCode("AV-01");
 
         assertThat(found).map(Scooter::storeId).contains(1L);
+    }
+
+    @Test
+    void whenInactiveScooterIsRetired_thenItIsStoredRetired() {
+        scooters.put("AV-20", ScooterState.INACTIVE);
+
+        Scooter retired = service.retire("AV-20");
+
+        assertThat(retired.state()).isEqualTo(ScooterState.RETIRED);
+        assertThat(scooters.stateOf("AV-20")).isEqualTo(ScooterState.RETIRED);
+    }
+
+    @Test
+    void whenAvailableScooterIsRetired_thenItIsRefusedAndStaysAvailable() {
+        scooters.put("AV-21", ScooterState.AVAILABLE);
+
+        assertThatThrownBy(() -> service.retire("AV-21"))
+                .isInstanceOf(ScooterStateChangeRefusedException.class);
+        assertThat(scooters.stateOf("AV-21")).isEqualTo(ScooterState.AVAILABLE);
+    }
+
+    @Test
+    void whenRetiredScooterIsRetiredAgain_thenItIsRefusedAndStaysRetired() {
+        scooters.put("AV-22", ScooterState.RETIRED);
+
+        assertThatThrownBy(() -> service.retire("AV-22"))
+                .isInstanceOf(ScooterStateChangeRefusedException.class);
+        assertThat(scooters.stateOf("AV-22")).isEqualTo(ScooterState.RETIRED);
+    }
+
+    @Test
+    void whenScooterToRetireDoesNotExist_thenNotFound() {
+        assertThatThrownBy(() -> service.retire("XX-99"))
+                .isInstanceOf(ScooterNotFoundException.class);
     }
 }

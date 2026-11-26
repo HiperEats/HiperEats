@@ -1,4 +1,4 @@
-@HE-37 @wip
+@HE-37
 Feature: Retire scooter
   As an operator, I want to retire a scooter, so that a scooter beyond repair is never offered again.
 
@@ -22,7 +22,10 @@ Feature: Retire scooter
       | reserved    |
       | in use      |
       | maintenance |
+      | retired     |
 
+  # Needs the step "the operator activates the scooter" of HE-30; remove @wip when HE-30 is in.
+  @wip
   Scenario: A retired scooter never changes state again
     Given a scooter that is retired
     When the operator activates the scooter

@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pt.ua.hipereats.application.port.in.RegisterScooterCommand;
 import pt.ua.hipereats.application.port.in.RegisterScooterUseCase;
+import pt.ua.hipereats.application.port.in.RetireScooterUseCase;
 import pt.ua.hipereats.application.port.in.ScooterQuery;
 import pt.ua.hipereats.application.port.out.ScooterRepository;
 import pt.ua.hipereats.application.port.out.StoreRepository;
@@ -14,7 +15,7 @@ import pt.ua.hipereats.domain.fleet.StoreNotFoundException;
 
 /** Fleet management use cases. */
 @Service
-public class FleetService implements RegisterScooterUseCase, ScooterQuery {
+public class FleetService implements RegisterScooterUseCase, RetireScooterUseCase, ScooterQuery {
 
     private final StoreRepository stores;
     private final ScooterRepository scooters;
@@ -42,5 +43,11 @@ public class FleetService implements RegisterScooterUseCase, ScooterQuery {
     @Transactional(readOnly = true)
     public Optional<Scooter> findByCode(String code) {
         return scooters.findByCode(code);
+    }
+
+    @Override
+    @Transactional
+    public Scooter retire(String code) {
+        throw new UnsupportedOperationException("HE-37: not implemented yet");
     }
 }
