@@ -3,12 +3,14 @@ package pt.ua.hipereats.domain.fleet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import app.getxray.xray.junit.customjunitxml.annotations.Requirement;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class StoreTest {
 
     @Test
+    @Requirement("HE-29")
     @DisplayName("BR13: the scooter that fills the store is accepted")
     void whenStoreHasOneFreePlace_thenScooterIsAccepted() {
         Store store = new Store(7L, 10, 9);
@@ -19,6 +21,7 @@ class StoreTest {
     }
 
     @Test
+    @Requirement("HE-29")
     @DisplayName("BR13: a scooter beyond the store capacity is refused")
     void whenStoreIsAtCapacity_thenScooterIsRefused() {
         Store store = new Store(7L, 10, 10);
@@ -29,6 +32,7 @@ class StoreTest {
     }
 
     @Test
+    @Requirement("HE-29")
     @DisplayName("BR13: a store above its capacity refuses another scooter")
     void whenStoreIsAboveCapacity_thenScooterIsRefused() {
         Store store = new Store(7L, 10, 11);
@@ -38,6 +42,7 @@ class StoreTest {
     }
 
     @Test
+    @Requirement("HE-29")
     @DisplayName("BR13: a registered scooter starts inactive")
     void whenScooterIsRegistered_thenItStartsInactive() {
         Store store = new Store(7L, 10, 0);
@@ -48,6 +53,7 @@ class StoreTest {
     }
 
     @Test
+    @Requirement("HE-29")
     void whenScooterIsRegistered_thenItKeepsItsCodeAndType() {
         Store store = new Store(7L, 10, 0);
 
