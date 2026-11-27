@@ -1,5 +1,6 @@
 package pt.ua.hipereats.adapters.out.persistence;
 
+import java.util.List;
 import java.util.Optional;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -8,6 +9,7 @@ import pt.ua.hipereats.application.port.out.ScooterRepository;
 import pt.ua.hipereats.application.port.out.StoreRepository;
 import pt.ua.hipereats.domain.fleet.Scooter;
 import pt.ua.hipereats.domain.fleet.ScooterCodeAlreadyUsedException;
+import pt.ua.hipereats.domain.fleet.ScooterState;
 import pt.ua.hipereats.domain.fleet.Store;
 
 /** Stores and scooters in PostgreSQL, through JPA. */
@@ -53,5 +55,12 @@ class FleetPersistenceAdapter implements StoreRepository, ScooterRepository {
     @Override
     public Optional<Scooter> findByCode(String code) {
         return scooters.findByCode(code).map(ScooterEntity::toScooter);
+    }
+
+    @Override
+    public List<Scooter> findByStoreAndState(long storeId, ScooterState state) {
+        return scooters.findByStoreIdAndState(storeId, state).stream()
+                .map(ScooterEntity::toScooter)
+                .toList();
     }
 }

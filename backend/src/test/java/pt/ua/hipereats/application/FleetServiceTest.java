@@ -45,6 +45,13 @@ class FleetServiceTest {
         public Optional<Scooter> findByCode(String code) {
             return added.stream().filter(s -> s.code().equals(code)).findFirst();
         }
+
+        @Override
+        public List<Scooter> findByStoreAndState(long storeId, ScooterState state) {
+            return added.stream()
+                    .filter(s -> s.storeId() == storeId && s.state() == state)
+                    .toList();
+        }
     }
 
     private final InMemoryStores stores = new InMemoryStores();

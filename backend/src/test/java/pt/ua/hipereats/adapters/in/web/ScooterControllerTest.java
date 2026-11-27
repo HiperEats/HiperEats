@@ -2,11 +2,14 @@ package pt.ua.hipereats.adapters.in.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
 import app.getxray.xray.junit.customjunitxml.annotations.Requirement;
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,6 +23,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
+import pt.ua.hipereats.application.port.in.AvailableScooter;
+import pt.ua.hipereats.application.port.in.AvailableScootersQuery;
 import pt.ua.hipereats.application.port.in.RegisterScooterCommand;
 import pt.ua.hipereats.application.port.in.RegisterScooterUseCase;
 import pt.ua.hipereats.application.port.in.ScooterQuery;
@@ -45,6 +50,9 @@ class ScooterControllerTest {
 
     @MockitoBean
     private ScooterQuery scooterQuery;
+
+    @MockitoBean
+    private AvailableScootersQuery availableScooters;
 
     private MvcTestResult post(String json) {
         return mvc.post().uri("/api/v1/scooters")
@@ -201,5 +209,45 @@ class ScooterControllerTest {
         assertThat(result).hasStatus(HttpStatus.NOT_FOUND)
                 .hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
         then(scooterQuery).should().findByCode("XX-99");
+    }
+
+    private MvcTestResult getAvailable(String query) {
+        return mvc.get().uri("/api/v1/scooters?" + query).exchange();
+    }
+
+    @Test
+    @Requirement("HE-31")
+    void whenCourierAsksForAvailableScooters_thenEachShowsItsTypeAndBattery() {
+        given(availableScooters.availableFor(1L, new BigDecimal("2.5"))).willReturn(List.of(
+                new AvailableScooter("AV-01", ScooterType.STANDARD, 80),
+                new AvailableScooter("AV-LR", ScooterType.LONG_RANGE, 60)));
+
+        MvcTestResult result = getAvailable("storeId=1&deliveryDistanceKm=2.5");
+
+        assertThat(result).hasStatusOk().bodyJson().isStrictlyEqualTo("""
+                [{"code": "AV-01", "type": "STANDARD", "batteryPercent": 80},
+                 {"code": "AV-LR", "type": "LONG_RANGE", "batteryPercent": 60}]
+                """);
+    }
+
+    @Test
+    @Requirement("HE-31")
+    void whenNoScooterIsAvailable_thenEmptyList() {
+        given(availableScooters.availableFor(1L, BigDecimal.ONE)).willReturn(List.of());
+
+        assertThat(getAvailable("storeId=1&deliveryDistanceKm=1")).hasStatusOk()
+                .bodyJson().isStrictlyEqualTo("[]");
+    }
+
+    @ParameterizedTest
+    @Requirement("HE-31")
+    @ValueSource(strings = {"storeId=1", "deliveryDistanceKm=1", "storeId=1&deliveryDistanceKm=far",
+            "storeId=1&deliveryDistanceKm=0", "storeId=1&deliveryDistanceKm=-1"})
+    void whenStoreOrDeliveryDistanceIsMissingOrInvalid_thenBadRequest(String query) {
+        MvcTestResult result = getAvailable(query);
+
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST)
+                .hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
+        then(availableScooters).should(never()).availableFor(anyLong(), any());
     }
 }

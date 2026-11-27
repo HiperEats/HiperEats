@@ -3,6 +3,8 @@ package pt.ua.hipereats;
 import java.util.UUID;
 import javax.sql.DataSource;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import pt.ua.hipereats.domain.fleet.ScooterState;
+import pt.ua.hipereats.domain.fleet.ScooterType;
 
 /**
  * Arranges stores and scooters directly in the database, for the integration and acceptance tests.
@@ -45,6 +47,17 @@ public final class FleetTestData {
                     .param("storeId", storeId)
                     .update();
         }
+    }
+
+    /** Puts a scooter with this code, type and state at the store, bypassing the API. */
+    public void addScooter(long storeId, String code, ScooterType type, ScooterState state) {
+        jdbc.sql("INSERT INTO scooters (code, type, state, store_id)"
+                        + " VALUES (:code, :type, :state, :storeId)")
+                .param("code", code)
+                .param("type", type.name())
+                .param("state", state.name())
+                .param("storeId", storeId)
+                .update();
     }
 
     public int countScootersWithCode(String code) {
