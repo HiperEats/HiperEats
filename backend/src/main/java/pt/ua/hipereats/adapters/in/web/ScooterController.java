@@ -20,8 +20,8 @@ import pt.ua.hipereats.domain.fleet.Scooter;
 import pt.ua.hipereats.domain.fleet.ScooterNotFoundException;
 
 /**
- * REST resource of the fleet's scooters. Only an operator registers scooters; any logged-in user can
- * look one up.
+ * REST resource of the fleet's scooters. Only an operator registers scooters and changes their
+ * state; any logged-in user can look one up.
  */
 @RestController
 @RequestMapping("/api/v1/scooters")
@@ -63,6 +63,7 @@ public class ScooterController {
      * change the scooter's current state does not allow is refused with {@code 409}.
      */
     @PatchMapping("/{code}")
+    @PreAuthorize("hasRole('OPERATOR')")
     public ScooterResponse changeState(@PathVariable String code,
             @RequestBody ChangeScooterStateRequest request) {
         Scooter scooter = switch (request.state()) {
