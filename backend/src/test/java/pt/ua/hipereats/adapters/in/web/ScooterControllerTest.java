@@ -370,4 +370,30 @@ class ScooterControllerTest {
         assertThat(result).hasStatus(HttpStatus.FORBIDDEN);
         then(registerScooter).should(never()).register(any());
     }
+
+    @Test
+    @Requirement("HE-30")
+    void whenNoTokenIsSent_thenUnauthorizedAndTheStateDoesNotChange() {
+        MvcTestResult result = mvc.patch().uri("/api/v1/scooters/AV-01")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"state": "INACTIVE"}
+                        """)
+                .exchange();
+
+        assertThat(result).hasStatus(HttpStatus.UNAUTHORIZED);
+        then(changeScooterState).shouldHaveNoInteractions();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"COURIER", "TECHNICIAN", "CHAIN_MANAGER", "ADMIN"})
+    @Requirement("HE-30")
+    void whenUserIsNotAnOperator_thenForbiddenAndTheStateDoesNotChange(String role) {
+        MvcTestResult result = patch("AV-01", """
+                {"state": "INACTIVE"}
+                """, loggedInAs(role));
+
+        assertThat(result).hasStatus(HttpStatus.FORBIDDEN);
+        then(changeScooterState).shouldHaveNoInteractions();
+    }
 }
