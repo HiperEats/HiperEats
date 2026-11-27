@@ -1,4 +1,4 @@
-@HE-28 @wip
+@HE-28
 Feature: Log in
   As a user, I want to log in with my account, so that I only see the features of my role.
 
@@ -26,6 +26,11 @@ Feature: Log in
       | admin         | list the user accounts   | allowed   |
       | courier       | list the user accounts   | forbidden |
       | operator      | list the user accounts   | forbidden |
+
+    # The rules of use have no endpoint until the Client rules customization epic (I4).
+    @wip
+    Examples:
+      | role          | action                   | result    |
       | chain manager | change the rules of use  | allowed   |
       | operator      | change the rules of use  | forbidden |
       | courier       | change the rules of use  | forbidden |

@@ -19,11 +19,19 @@ public class ScenarioScooterSteps {
 
     private final RestTestClient client;
     private final FleetTestData data;
+    /** Who is logged in: the steps send that user's token. */
+    private final AccountSteps accounts;
     private String code;
 
-    public ScenarioScooterSteps(RestTestClient client, DataSource dataSource) {
+    public ScenarioScooterSteps(RestTestClient client, DataSource dataSource, AccountSteps accounts) {
         this.client = client;
         this.data = new FleetTestData(dataSource);
+        this.accounts = accounts;
+    }
+
+    /** "Bearer ..." of the user logged in in the scenario. */
+    String bearer() {
+        return "Bearer " + accounts.accessToken();
     }
 
     /** A state as the features write it: "inactive", "in use", ... */
@@ -48,6 +56,7 @@ public class ScenarioScooterSteps {
     @Then("the scooter is {scooterState}")
     public void theScooterIs(ScooterState state) {
         client.get().uri("/api/v1/scooters/{code}", code)
+                .header("Authorization", bearer())
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()

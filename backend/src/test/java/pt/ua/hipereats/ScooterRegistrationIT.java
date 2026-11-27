@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import app.getxray.xray.junit.customjunitxml.annotations.Requirement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -18,6 +19,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.test.web.servlet.client.RestTestClient.ResponseSpec;
+import pt.ua.hipereats.application.port.out.TokenIssuer;
+import pt.ua.hipereats.application.port.out.UserAccountRepository;
+import pt.ua.hipereats.domain.account.Role;
+import pt.ua.hipereats.domain.account.UserAccount;
 
 /**
  * Registering a scooter through the REST API, on the whole application and a real PostgreSQL (HE-29).
@@ -31,15 +36,28 @@ class ScooterRegistrationIT {
     @Autowired
     private DataSource dataSource;
 
+    @Autowired
+    private UserAccountRepository accounts;
+
+    @Autowired
+    private TokenIssuer tokenIssuer;
+
     private FleetTestData data;
+
+    /** "Bearer ..." of an operator, the role that registers scooters. */
+    private String operator;
 
     @BeforeEach
     void setUp() {
         data = new FleetTestData(dataSource);
+        UserAccount account = accounts.save(UserAccount.newAccount(
+                "operator-" + UUID.randomUUID() + "@example.test", "{noop}unused", Role.OPERATOR));
+        operator = "Bearer " + tokenIssuer.issue(account).value();
     }
 
     private ResponseSpec register(String code, String type, long storeId) {
         return client.post().uri("/api/v1/scooters")
+                .header("Authorization", operator)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body("""
                         {"code": "%s", "type": "%s", "storeId": %d}
@@ -60,6 +78,7 @@ class ScooterRegistrationIT {
         register(code, "LONG_RANGE", storeId).expectStatus().isCreated();
 
         client.get().uri("/api/v1/scooters/{code}", code)
+                .header("Authorization", operator)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()

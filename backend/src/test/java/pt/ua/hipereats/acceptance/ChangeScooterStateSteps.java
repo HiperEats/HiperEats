@@ -25,6 +25,7 @@ public class ChangeScooterStateSteps {
 
     private void changeStateTo(ScooterState state) {
         change = client.patch().uri("/api/v1/scooters/{code}", scooter.code())
+                .header("Authorization", scooter.bearer())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body("""
                         {"state": "%s"}

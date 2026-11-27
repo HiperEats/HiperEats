@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 
 import app.getxray.xray.junit.customjunitxml.annotations.Requirement;
 import java.util.Optional;
@@ -13,11 +14,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
@@ -35,6 +39,7 @@ import pt.ua.hipereats.domain.fleet.StoreAtCapacityException;
 import pt.ua.hipereats.domain.fleet.StoreNotFoundException;
 
 @WebMvcTest(ScooterController.class)
+@Import(SecurityConfiguration.class)
 class ScooterControllerTest {
 
     private static final String REGISTER_AV01 = """
@@ -53,8 +58,18 @@ class ScooterControllerTest {
     @MockitoBean
     private RetireScooterUseCase retireScooter;
 
+    /** A request authenticated as a user with this role, without signing a real token. */
+    private static JwtRequestPostProcessor loggedInAs(String role) {
+        return jwt().authorities(new SimpleGrantedAuthority("ROLE_" + role));
+    }
+
     private MvcTestResult post(String json) {
+        return post(json, loggedInAs("OPERATOR"));
+    }
+
+    private MvcTestResult post(String json, JwtRequestPostProcessor user) {
         return mvc.post().uri("/api/v1/scooters")
+                .with(user)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json)
                 .exchange();
@@ -191,7 +206,7 @@ class ScooterControllerTest {
         given(scooterQuery.findByCode("AV-01")).willReturn(Optional.of(
                 new Scooter("AV-01", ScooterType.STANDARD, ScooterState.INACTIVE, 1L)));
 
-        MvcTestResult result = mvc.get().uri("/api/v1/scooters/AV-01").exchange();
+        MvcTestResult result = mvc.get().uri("/api/v1/scooters/AV-01").with(loggedInAs("COURIER")).exchange();
 
         assertThat(result).hasStatusOk().bodyJson().isLenientlyEqualTo("""
                 {"code": "AV-01", "type": "STANDARD", "state": "INACTIVE", "storeId": 1}
@@ -203,7 +218,7 @@ class ScooterControllerTest {
     void whenScooterDoesNotExist_thenNotFound() {
         given(scooterQuery.findByCode("XX-99")).willReturn(Optional.empty());
 
-        MvcTestResult result = mvc.get().uri("/api/v1/scooters/XX-99").exchange();
+        MvcTestResult result = mvc.get().uri("/api/v1/scooters/XX-99").with(loggedInAs("COURIER")).exchange();
 
         assertThat(result).hasStatus(HttpStatus.NOT_FOUND)
                 .hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
@@ -212,7 +227,12 @@ class ScooterControllerTest {
     }
 
     private MvcTestResult patch(String code, String json) {
+        return patch(code, json, loggedInAs("OPERATOR"));
+    }
+
+    private MvcTestResult patch(String code, String json, JwtRequestPostProcessor user) {
         return mvc.patch().uri("/api/v1/scooters/{code}", code)
+                .with(user)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json)
                 .exchange();
@@ -226,11 +246,13 @@ class ScooterControllerTest {
     }
 
     @Test
+    @Requirement("HE-37")
     void whenStateIsMissing_thenBadRequest() {
         assertStateChangeBadRequest(patch("AV-01", "{}"));
     }
 
     @Test
+    @Requirement("HE-37")
     void whenStateIsUnknown_thenBadRequest() {
         assertStateChangeBadRequest(patch("AV-01", """
                 {"state": "BROKEN"}
@@ -238,6 +260,7 @@ class ScooterControllerTest {
     }
 
     @Test
+    @Requirement("HE-37")
     void whenOperatorSetsTheStateToRetired_thenTheScooterIsRetired() {
         given(retireScooter.retire("AV-01")).willReturn(
                 new Scooter("AV-01", ScooterType.STANDARD, ScooterState.RETIRED, 1L));
@@ -253,6 +276,7 @@ class ScooterControllerTest {
     }
 
     @Test
+    @Requirement("HE-37")
     void whenRetirementIsRefused_thenConflict() {
         given(retireScooter.retire("AV-01")).willThrow(new ScooterStateChangeRefusedException(
                 "AV-01", ScooterState.AVAILABLE, ScooterState.RETIRED));
@@ -268,6 +292,7 @@ class ScooterControllerTest {
     }
 
     @Test
+    @Requirement("HE-37")
     void whenScooterToRetireDoesNotExist_thenNotFound() {
         given(retireScooter.retire("XX-99")).willThrow(new ScooterNotFoundException("XX-99"));
 
@@ -281,6 +306,7 @@ class ScooterControllerTest {
 
     /** RESERVED is reached through bookings, never set by the operator. */
     @Test
+    @Requirement("HE-37")
     void whenOperatorSetsAStateReachedThroughBookings_thenBadRequestAndNothingIsRetired() {
         MvcTestResult result = patch("AV-01", """
                 {"state": "RESERVED"}
@@ -293,6 +319,7 @@ class ScooterControllerTest {
 
     /** Another change holds the scooter's lock for longer than the lock timeout. */
     @Test
+    @Requirement("HE-37")
     void whenScooterIsLockedByAnotherChange_thenConflict() {
         given(retireScooter.retire("AV-01"))
                 .willThrow(new CannotAcquireLockException("lock timeout"));
@@ -303,5 +330,27 @@ class ScooterControllerTest {
 
         assertThat(result).hasStatus(HttpStatus.CONFLICT)
                 .hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
+    }
+
+    @Test
+    @Requirement("HE-29")
+    void whenNoTokenIsSent_thenUnauthorizedAndNothingIsRegistered() {
+        MvcTestResult result = mvc.post().uri("/api/v1/scooters")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(REGISTER_AV01)
+                .exchange();
+
+        assertThat(result).hasStatus(HttpStatus.UNAUTHORIZED);
+        then(registerScooter).should(never()).register(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"COURIER", "TECHNICIAN", "CHAIN_MANAGER", "ADMIN"})
+    @Requirement("HE-29")
+    void whenUserIsNotAnOperator_thenForbiddenAndNothingIsRegistered(String role) {
+        MvcTestResult result = post(REGISTER_AV01, loggedInAs(role));
+
+        assertThat(result).hasStatus(HttpStatus.FORBIDDEN);
+        then(registerScooter).should(never()).register(any());
     }
 }
