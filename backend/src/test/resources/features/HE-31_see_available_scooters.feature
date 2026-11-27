@@ -1,4 +1,4 @@
-@HE-31 @wip
+@HE-31
 Feature: See available scooters
   As a courier, I want to see the available scooters at my store, so that I can pick one for my delivery.
 
