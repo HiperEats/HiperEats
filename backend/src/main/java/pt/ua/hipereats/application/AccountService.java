@@ -1,6 +1,7 @@
 package pt.ua.hipereats.application;
 
 import java.util.List;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import pt.ua.hipereats.application.port.in.ListAccountsQuery;
 import pt.ua.hipereats.application.port.in.LogInUseCase;
@@ -18,11 +19,17 @@ public class AccountService implements LogInUseCase, ListAccountsQuery {
     private final UserAccountRepository accounts;
     private final PasswordHasher passwordHasher;
     private final TokenIssuer tokenIssuer;
+    /**
+     * Checked when the email has no account, so that the answer takes as long as a wrong password:
+     * otherwise the time of the 401 would tell which emails have an account.
+     */
+    private final String dummyHash;
 
     public AccountService(UserAccountRepository accounts, PasswordHasher passwordHasher, TokenIssuer tokenIssuer) {
         this.accounts = accounts;
         this.passwordHasher = passwordHasher;
         this.tokenIssuer = tokenIssuer;
+        this.dummyHash = passwordHasher.hash("no-account-has-this-password");
     }
 
     @Override
@@ -30,9 +37,10 @@ public class AccountService implements LogInUseCase, ListAccountsQuery {
         if (password == null) {
             throw new InvalidCredentialsException();
         }
-        UserAccount account = accounts.findByEmail(UserAccount.normalizeEmail(email))
-                .filter(found -> passwordHasher.matches(password, found.passwordHash()))
-                .orElseThrow(InvalidCredentialsException::new);
+        Optional<UserAccount> found = accounts.findByEmail(UserAccount.normalizeEmail(email));
+        String hash = found.map(UserAccount::passwordHash).orElse(dummyHash);
+        boolean passwordMatches = passwordHasher.matches(password, hash);
+        UserAccount account = found.filter(a -> passwordMatches).orElseThrow(InvalidCredentialsException::new);
         IssuedToken token = tokenIssuer.issue(account);
         return new Session(token.value(), token.expiresAt(), account.email(), account.role());
     }
