@@ -1,30 +1,78 @@
 version: 2
 updates:
-  # Pull requests go to dev, as every other change (without target-branch they go to main).
+  # Every entry sends its version updates to dev, as every other change; target-branch keeps it so
+  # even if the repository's default branch changes. Minor and patch updates of one ecosystem come
+  # together in one weekly pull request, to keep the number of pull requests (and CI runs) low.
+  # Security updates are separate pull requests to the default branch; they need Dependabot alerts
+  # and Dependabot security updates turned on in the repository settings (Advanced Security).
+
+  # GitHub Actions used by the workflows in .github/workflows
   - package-ecosystem: "github-actions"
     directory: "/"
     target-branch: "dev"
     schedule:
       interval: "weekly"
+    groups:
+      github-actions:
+        update-types: ["minor", "patch"]
 
-  # Uncomment once each subproject has its build file
-  # - package-ecosystem: "maven"
-  #   directory: "/backend"
-  #   schedule:
-  #     interval: "weekly"
+  # Backend dependencies (backend/pom.xml)
+  - package-ecosystem: "maven"
+    directory: "/backend"
+    target-branch: "dev"
+    schedule:
+      interval: "weekly"
+    groups:
+      backend:
+        update-types: ["minor", "patch"]
 
+  # Simulator dependencies (simulator/pom.xml)
   - package-ecosystem: "maven"
     directory: "/simulator"
     target-branch: "dev"
     schedule:
       interval: "weekly"
+    groups:
+      simulator:
+        update-types: ["minor", "patch"]
 
-  # - package-ecosystem: "npm"
-  #   directory: "/frontend"
-  #   schedule:
-  #     interval: "weekly"
+  # Frontend dependencies (frontend/package.json and package-lock.json)
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    target-branch: "dev"
+    schedule:
+      interval: "weekly"
+    groups:
+      frontend:
+        update-types: ["minor", "patch"]
 
-  # - package-ecosystem: "docker"
-  #   directory: "/"
-  #   schedule:
-  #     interval: "weekly"
+  # Base images of the Dockerfiles. Major versions are ignored: Java 21 and Node 22 are team
+  # decisions (AGENTS.md), so a jump to a new major is a decision, not a routine update.
+  - package-ecosystem: "docker"
+    directories:
+      - "/backend"
+      - "/frontend"
+      - "/simulator"
+    target-branch: "dev"
+    schedule:
+      interval: "weekly"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      docker:
+        update-types: ["minor", "patch"]
+
+  # Images in docker-compose.yml. Major versions are ignored: PostgreSQL 18 is a team decision and
+  # must match the image of the integration tests (PostgresTestcontainersConfiguration).
+  - package-ecosystem: "docker-compose"
+    directory: "/"
+    target-branch: "dev"
+    schedule:
+      interval: "weekly"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      docker-compose:
+        update-types: ["minor", "patch"]
