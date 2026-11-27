@@ -2,6 +2,7 @@ package pt.ua.hipereats;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.jayway.jsonpath.JsonPath;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.util.ArrayList;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.client.EntityExchangeResult;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.test.web.servlet.client.RestTestClient.ResponseSpec;
 import pt.ua.hipereats.domain.fleet.ScooterState;
@@ -74,9 +76,24 @@ class ScooterRetirementIT {
                 .expectHeader().contentType(MediaType.APPLICATION_PROBLEM_JSON);
     }
 
+    /** The status of a response and, for an error, the title of its ProblemDetail. */
+    private record Outcome(int status, String title) {
+
+        static Outcome of(EntityExchangeResult<String> result) {
+            int status = result.getStatus().value();
+            String title = status == 200 ? null : JsonPath.read(result.getResponseBody(), "$.title");
+            return new Outcome(status, title);
+        }
+    }
+
     /**
-     * The scooter row is locked while it changes state, so two changes of the same scooter run one
-     * after the other and the second one sees the first: a retired scooter never changes again.
+     * The scooter row is locked while it changes state, so concurrent retirements run one after the
+     * other: the first one retires the scooter, and every other one reads it already retired and is
+     * refused by the lifecycle ("Scooter state change refused").
+     *
+     * <p>This is what proves the lock. Without it, all of them would read the scooter inactive, the
+     * conditional update would still let only one through, and the others would fail on the update
+     * with "Concurrent change" instead.
      */
     @Test
     void whenTheSameScooterIsRetiredConcurrently_thenOnlyOneRetirementIsAccepted() throws Exception {
@@ -84,26 +101,30 @@ class ScooterRetirementIT {
         // Fewer requests than the 10 connections of the default Hikari pool (see ScooterRegistrationIT).
         int attempts = 8;
         CountDownLatch start = new CountDownLatch(1);
-        List<Future<Integer>> statuses = new ArrayList<>();
-        List<Integer> results = new ArrayList<>();
+        List<Future<Outcome>> pending = new ArrayList<>();
+        List<Outcome> outcomes = new ArrayList<>();
 
         ExecutorService pool = Executors.newFixedThreadPool(attempts);
         try {
             for (int i = 0; i < attempts; i++) {
-                statuses.add(pool.submit(() -> {
+                pending.add(pool.submit(() -> {
                     start.await();
-                    return retire(code).returnResult().getStatus().value();
+                    return Outcome.of(retire(code).expectBody(String.class).returnResult());
                 }));
             }
             start.countDown();
-            for (Future<Integer> status : statuses) {
-                results.add(status.get(30, TimeUnit.SECONDS));
+            for (Future<Outcome> outcome : pending) {
+                outcomes.add(outcome.get(30, TimeUnit.SECONDS));
             }
         } finally {
             pool.shutdownNow();
         }
 
-        assertThat(results).containsOnly(200, 409).containsOnlyOnce(200);
+        assertThat(outcomes).filteredOn(o -> o.status() == 200).hasSize(1);
+        assertThat(outcomes).filteredOn(o -> o.status() != 200)
+                .hasSize(attempts - 1)
+                .allSatisfy(o -> assertThat(o).isEqualTo(
+                        new Outcome(409, "Scooter state change refused")));
         assertThat(data.stateOf(code)).isEqualTo(ScooterState.RETIRED);
     }
 
