@@ -23,15 +23,22 @@ public class RegisterScooterSteps {
     private final RestTestClient client;
     private final FleetTestData data;
     private final ScenarioScooterSteps scooter;
+    /** Who is logged in: the steps send that user's token. */
+    private final AccountSteps accounts;
     private long storeId;
     private String scooterCode;
     private ResponseSpec registration;
 
     public RegisterScooterSteps(RestTestClient client, DataSource dataSource,
-            ScenarioScooterSteps scooter) {
+            ScenarioScooterSteps scooter, AccountSteps accounts) {
         this.client = client;
         this.data = new FleetTestData(dataSource);
         this.scooter = scooter;
+        this.accounts = accounts;
+    }
+
+    private String bearer() {
+        return "Bearer " + accounts.accessToken();
     }
 
     @Given("a store with capacity {int} and {int} scooters")
@@ -45,6 +52,7 @@ public class RegisterScooterSteps {
         scooterCode = FleetTestData.uniqueCode();
         scooter.use(scooterCode);
         registration = client.post().uri("/api/v1/scooters")
+                .header("Authorization", bearer())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body("""
                         {"code": "%s", "type": "STANDARD", "storeId": %d}
@@ -59,6 +67,7 @@ public class RegisterScooterSteps {
         assertThat(location).as("Location of the registered scooter")
                 .hasToString("/api/v1/scooters/" + scooterCode);
         client.get().uri(location.toString())
+                .header("Authorization", bearer())
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()

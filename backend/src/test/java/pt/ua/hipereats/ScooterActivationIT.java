@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.jayway.jsonpath.JsonPath;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -18,6 +19,10 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.client.EntityExchangeResult;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.test.web.servlet.client.RestTestClient.ResponseSpec;
+import pt.ua.hipereats.application.port.out.TokenIssuer;
+import pt.ua.hipereats.application.port.out.UserAccountRepository;
+import pt.ua.hipereats.domain.account.Role;
+import pt.ua.hipereats.domain.account.UserAccount;
 import pt.ua.hipereats.domain.fleet.ScooterState;
 
 /**
@@ -33,17 +38,30 @@ class ScooterActivationIT {
     @Autowired
     private DataSource dataSource;
 
+    @Autowired
+    private UserAccountRepository accounts;
+
+    @Autowired
+    private TokenIssuer tokenIssuer;
+
     private FleetTestData data;
     private long storeId;
+
+    /** "Bearer ..." of an operator, the role that activates and deactivates scooters. */
+    private String operator;
 
     @BeforeEach
     void setUp() {
         data = new FleetTestData(dataSource);
         storeId = data.createStore(10);
+        UserAccount account = accounts.save(UserAccount.newAccount(
+                "operator-" + UUID.randomUUID() + "@example.test", "{noop}unused", Role.OPERATOR));
+        operator = "Bearer " + tokenIssuer.issue(account).value();
     }
 
     private ResponseSpec changeState(String code, ScooterState state) {
         return client.patch().uri("/api/v1/scooters/{code}", code)
+                .header("Authorization", operator)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body("""
                         {"state": "%s"}
