@@ -16,18 +16,25 @@ import java.math.BigDecimal;
 public record RangeRule(BigDecimal standardFullRangeKm, BigDecimal longRangeFullRangeKm,
                         BigDecimal margin) {
 
+    private static final BigDecimal TWO = BigDecimal.valueOf(2);
+
     /** The distance the scooter can still ride with this battery level. */
     public BigDecimal estimatedRangeKm(ScooterType type, int batteryPercent) {
-        throw new UnsupportedOperationException("HE-31: not implemented yet");
+        BigDecimal fullRange = switch (type) {
+            case STANDARD -> standardFullRangeKm;
+            case LONG_RANGE -> longRangeFullRangeKm;
+        };
+        return fullRange.multiply(BigDecimal.valueOf(batteryPercent)).movePointLeft(2);
     }
 
     /** The range a delivery at this distance needs: there and back, plus the margin. */
     public BigDecimal requiredRangeKm(BigDecimal deliveryDistanceKm) {
-        throw new UnsupportedOperationException("HE-31: not implemented yet");
+        return TWO.multiply(deliveryDistanceKm).multiply(margin);
     }
 
     /** True if a scooter of this type and battery level can serve a delivery at this distance. */
     public boolean covers(ScooterType type, int batteryPercent, BigDecimal deliveryDistanceKm) {
-        throw new UnsupportedOperationException("HE-31: not implemented yet");
+        return estimatedRangeKm(type, batteryPercent)
+                .compareTo(requiredRangeKm(deliveryDistanceKm)) >= 0;
     }
 }

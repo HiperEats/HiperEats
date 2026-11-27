@@ -59,6 +59,8 @@ class FleetPersistenceAdapter implements StoreRepository, ScooterRepository {
 
     @Override
     public List<Scooter> findByStoreAndState(long storeId, ScooterState state) {
-        throw new UnsupportedOperationException("HE-31: not implemented yet");
+        return scooters.findByStoreIdAndState(storeId, state).stream()
+                .map(ScooterEntity::toScooter)
+                .toList();
     }
 }

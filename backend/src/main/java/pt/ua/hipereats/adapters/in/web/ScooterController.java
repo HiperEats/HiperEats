@@ -65,6 +65,12 @@ public class ScooterController {
     @GetMapping
     public List<AvailableScooterResponse> available(@RequestParam long storeId,
                                                     @RequestParam BigDecimal deliveryDistanceKm) {
-        throw new UnsupportedOperationException("HE-31: not implemented yet");
+        if (deliveryDistanceKm.signum() <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "deliveryDistanceKm must be greater than 0");
+        }
+        return availableScooters.availableFor(storeId, deliveryDistanceKm).stream()
+                .map(AvailableScooterResponse::from)
+                .toList();
     }
 }
