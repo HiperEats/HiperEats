@@ -2,6 +2,7 @@ package pt.ua.hipereats;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.jayway.jsonpath.JsonPath;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.client.EntityExchangeResult;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.test.web.servlet.client.RestTestClient.ResponseSpec;
 import pt.ua.hipereats.domain.fleet.ScooterState;
@@ -95,37 +97,51 @@ class ScooterActivationIT {
     }
 
     /**
-     * Each request reads the scooter's state before it changes it. Without the lock on the scooter
-     * row, every concurrent deactivation would read AVAILABLE and be accepted.
+     * The lock on the scooter row makes the concurrent deactivations wait for one another, so after
+     * the first one the others read INACTIVE and the scooter lifecycle refuses them ("Scooter state
+     * change refused"). Without the lock, all of them would read AVAILABLE and pass the lifecycle;
+     * the conditional update would still refuse all but one, but as "Concurrent change". The titles
+     * tell the two apart, so this test fails if the lock is removed.
      */
     @Test
-    void whenDeactivationsRaceForTheSameScooter_thenOnlyOneIsAccepted() throws Exception {
+    void whenDeactivationsRaceForTheSameScooter_thenOneIsAcceptedAndTheOthersSeeItInactive()
+            throws Exception {
         String code = data.addScooter(storeId, ScooterState.AVAILABLE);
         // 8 requests at once, fewer than the 10 connections of the default Hikari pool, so that no
         // request waits for a connection and all of them reach the lock on the scooter together.
         int attempts = 8;
         CountDownLatch start = new CountDownLatch(1);
-        List<Future<Integer>> statuses = new ArrayList<>();
-        List<Integer> results = new ArrayList<>();
+        List<Future<String>> outcomes = new ArrayList<>();
+        List<String> results = new ArrayList<>();
 
         ExecutorService pool = Executors.newFixedThreadPool(attempts);
         try {
             for (int i = 0; i < attempts; i++) {
-                statuses.add(pool.submit(() -> {
+                outcomes.add(pool.submit(() -> {
                     start.await();
-                    return changeState(code, ScooterState.INACTIVE)
-                            .returnResult().getStatus().value();
+                    return outcome(changeState(code, ScooterState.INACTIVE)
+                            .returnResult(String.class));
                 }));
             }
             start.countDown();
-            for (Future<Integer> status : statuses) {
-                results.add(status.get(30, TimeUnit.SECONDS));
+            for (Future<String> outcome : outcomes) {
+                results.add(outcome.get(30, TimeUnit.SECONDS));
             }
         } finally {
             pool.shutdownNow();
         }
 
-        assertThat(results).containsOnly(200, 409).containsOnlyOnce(200);
+        assertThat(results).containsOnlyOnce("200")
+                .containsOnly("200", "409 Scooter state change refused");
         assertThat(data.stateOf(code)).isEqualTo(ScooterState.INACTIVE);
+    }
+
+    /** "200", or the status and the ProblemDetail title of a refusal: "409 Concurrent change". */
+    private static String outcome(EntityExchangeResult<String> result) {
+        int status = result.getStatus().value();
+        if (status == 200) {
+            return "200";
+        }
+        return status + " " + JsonPath.read(result.getResponseBody(), "$.title");
     }
 }
