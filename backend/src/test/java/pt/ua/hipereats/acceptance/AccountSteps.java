@@ -148,6 +148,11 @@ public class AccountSteps {
                 .expectStatus().isUnauthorized();
     }
 
+    /** The token of the user who logged in last in the scenario, for the steps of other features. */
+    public String accessToken() {
+        return accessToken;
+    }
+
     @When("{string} logs in with password {string}")
     public void logsInWithPassword(String email, String password) {
         response = logIn(email, password);
