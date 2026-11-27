@@ -14,11 +14,11 @@ import java.util.regex.Pattern;
 public record UserAccount(Long id, String email, String passwordHash, Role role) {
 
     /** Something before and after one "@"; the real check is that the person receives mail there. */
-    private static final Pattern EMAIL = Pattern.compile("[^@\\s]+@[^@\\s]+");
+    private static final Pattern EMAIL_FORMAT = Pattern.compile("[^@\\s]+@[^@\\s]+");
 
     public UserAccount {
         email = normalizeEmail(email);
-        if (!EMAIL.matcher(email).matches()) {
+        if (!EMAIL_FORMAT.matcher(email).matches()) {
             throw new IllegalArgumentException("Not an email address: " + email);
         }
         if (passwordHash == null || passwordHash.isBlank()) {
