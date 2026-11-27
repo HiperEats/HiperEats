@@ -5,6 +5,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import pt.ua.hipereats.application.InvalidCredentialsException;
 import pt.ua.hipereats.domain.fleet.ScooterCodeAlreadyUsedException;
 import pt.ua.hipereats.domain.fleet.StoreAtCapacityException;
 import pt.ua.hipereats.domain.fleet.StoreNotFoundException;
@@ -16,6 +17,11 @@ import pt.ua.hipereats.domain.fleet.StoreNotFoundException;
  */
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    ProblemDetail invalidCredentials(InvalidCredentialsException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, exception.getMessage());
+    }
 
     @ExceptionHandler(StoreAtCapacityException.class)
     ProblemDetail storeAtCapacity(StoreAtCapacityException e) {

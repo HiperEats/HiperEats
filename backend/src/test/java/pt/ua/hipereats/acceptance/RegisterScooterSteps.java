@@ -27,13 +27,20 @@ public class RegisterScooterSteps {
 
     private final RestTestClient client;
     private final FleetTestData data;
+    /** Who is logged in: the steps send that user's token. */
+    private final AccountSteps accounts;
     private long storeId;
     private String scooterCode;
     private ResponseSpec registration;
 
-    public RegisterScooterSteps(RestTestClient client, DataSource dataSource) {
+    public RegisterScooterSteps(RestTestClient client, DataSource dataSource, AccountSteps accounts) {
         this.client = client;
         this.data = new FleetTestData(dataSource);
+        this.accounts = accounts;
+    }
+
+    private String bearer() {
+        return "Bearer " + accounts.accessToken();
     }
 
     /** A state as the features write it: "inactive", "in use", ... */
@@ -52,6 +59,7 @@ public class RegisterScooterSteps {
     public void theOperatorRegistersAStandardScooterAtThatStore() {
         scooterCode = FleetTestData.uniqueCode();
         registration = client.post().uri("/api/v1/scooters")
+                .header("Authorization", bearer())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body("""
                         {"code": "%s", "type": "STANDARD", "storeId": %d}
@@ -66,6 +74,7 @@ public class RegisterScooterSteps {
         assertThat(location).as("Location of the registered scooter")
                 .hasToString("/api/v1/scooters/" + scooterCode);
         client.get().uri(location.toString())
+                .header("Authorization", bearer())
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
@@ -77,6 +86,7 @@ public class RegisterScooterSteps {
     @Then("the scooter is {scooterState}")
     public void theScooterIs(ScooterState state) {
         client.get().uri("/api/v1/scooters/{code}", scooterCode)
+                .header("Authorization", bearer())
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
