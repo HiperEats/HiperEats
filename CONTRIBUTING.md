@@ -70,7 +70,40 @@ Run the tests of every part you changed before opening a pull request. CI runs `
 
 If you changed only documentation (Markdown files or images), you do not need to set up the project or run the tests: check the links and how the page looks on GitHub. The branch, the pull request and the approval are the same, and CI still runs.
 
-Reports: `backend/target/surefire-reports/` (unit), `backend/target/failsafe-reports/` (integration), `backend/target/cucumber/cucumber.html` (acceptance) and `backend/target/site/jacoco/index.html` (coverage). Without `clean`, the coverage of earlier runs is added to the report.
+Reports: `backend/target/surefire-reports/` (unit), `backend/target/failsafe-reports/` (integration), `backend/target/cucumber/cucumber.html` (acceptance), `backend/target/site/jacoco/index.html` (coverage) and `backend/target/xray/` (the reports for Xray). Without `clean`, the coverage of earlier runs is added to the report.
+
+## Work process
+
+The short version of how the team works; the QA Manual (HE-42) will have the full one, and the two must agree.
+
+### Iterations
+
+- Five one-week iterations, from Friday to Friday. Each one starts at the checkpoint in the practical class (P4, Fridays), where we show the outcomes of the one that ends.
+- **Kick-off meeting**, on the checkpoint day: we record the professor's feedback, plan the iteration (sprint planning) and create its sprint in Jira with the stories and tasks we commit to. Each member takes stories and tasks of their own.
+- **Grooming:** the Product Owner writes and refines the stories of the next iteration; the team reviews them, estimates their story points and checks the definition of ready before they enter a sprint.
+- **Team meetings:** one or two a week. The minutes are in [docs/Minutes](docs/Minutes), one file per meeting (`minutes-YYYY-MM-DD[-<topic>].md`, the topic is optional), with the decisions, who does what, and the open questions.
+- **End of the iteration:** everything for the checkpoint is merged into `dev`, `dev` goes to `main` through a pull request **(proposal)**, the reports are exported as PDF to `docs/`, and `main` is tagged `iter<n>` (`iter1`, `iter2`, ...). The final presentation (18 Dec) is tagged `v1.0`. The burndown and velocity charts of the sprint are in Jira (Reports).
+
+### From the backlog to done
+
+1. Grooming: the story meets the [definition of ready](#definition-of-ready) and enters the sprint at sprint planning. Jira: **To Do**.
+2. A member takes it, creates its branch and writes the tests first, at least for the business rules (see [Workflow](#workflow) and [Tests](#tests)). Jira: **In Progress**.
+3. Pull request to `dev`, with the template filled in. CI runs the build, the tests and the SonarCloud quality gate; Claude reviews it, and another member reviews it (see [Reviews](#reviews)). Jira: **In Review**.
+4. Approval, every conversation resolved and the required checks green; the author merges (see [Merge rules](#merge-rules)). On `dev`, CI imports the test results into Xray, where the story shows its coverage (HE-41).
+5. The story meets the [definition of done](#definition-of-done) and the Product Owner accepts it. Jira: **Done**.
+
+### Roles
+
+Everyone develops: implements and tests stories, with their own pull requests and commits. On top of that, each member holds one or more roles (who holds each one is in the [README](README.md#project-team)):
+
+| Role | Does |
+|---|---|
+| Team Coordinator | Distributes the tasks fairly and checks that the team follows the plan; acts early on problems; makes sure the outcomes are delivered on time |
+| Product Owner | Represents the client and knows the domain; writes and refines the stories and the Product Specification; clarifies features for the team; accepts the story increments |
+| QA Engineer | Promotes the QA practices with the other roles; makes sure the tools that measure quality are in place (quality gate, Xray, dependency scanning, AI review); checks that the team follows the agreed practices, including the AI rules |
+| DevOps Master | Makes sure the development and production infrastructure is in place: repository and its rules, CI/CD pipelines, containers, deployment environment, databases |
+
+A role answers for an area; the tasks themselves are distributed among everyone at the kick-off meeting. For example, the quality gate (HE-40) is Daniel's (decision 5 of the [minutes of 20 Nov](docs/Minutes/minutes-2026-11-20-i2-kickoff.md)).
 
 ## Workflow
 
@@ -78,7 +111,7 @@ We follow GitHub flow with an integration branch, `dev`. Every change reaches `d
 
 `dev` goes to `main` at the end of each iteration, with CI passing **(proposal)**.
 
-1. Pick a story or task from the current sprint in Jira (see [Stories](#stories)) and move it to **In Progress**.
+1. Pick a story or task from the current sprint in Jira that meets the [definition of ready](#definition-of-ready) (see [Stories](#stories)) and move it to **In Progress**.
 2. Create a branch from an up-to-date `dev`, named after the story key: `HE-<n>-short-description` (for example `HE-12-booking-endpoint`).
 
    ```bash
@@ -91,7 +124,7 @@ We follow GitHub flow with an integration branch, `dev`. Every change reaches `d
 5. Run the tests and push: `git push -u origin HE-12-booking-endpoint`.
 6. Open a pull request to `dev` whose title starts with the story key (`HE-12 Add booking endpoint`), fill in the template and move the story to **In Review**. One story per pull request.
 7. Answer the review. CI runs the build and the tests, and Claude reviews the pull request. Record in the template which of its findings you accepted or rejected, and why.
-8. At least one other member approves and CI passes. The author merges and moves the story to **Done**.
+8. At least one other member approves and CI passes. The author merges. The story moves to **Done** once it meets the [definition of done](#definition-of-done) and the Product Owner accepts it.
 
 Agents never merge. A human approves every pull request.
 
@@ -105,11 +138,30 @@ Agents never merge. A human approves every pull request.
 ### Merge rules
 
 - GitHub blocks direct pushes to `dev` and `main`, and blocks the merge until another member has approved and every review conversation is resolved. A new push cancels the approvals already given.
-- GitHub also blocks the merge until these checks pass: `Backend (build and tests)`, `Simulator (build and tests)`, `Frontend (lint, tests and build)` and `Quality gate (SonarCloud)`. The ruleset of `dev` and `main` requires them from the merge of HE-40 on; until then, never merge with CI failing. The quality gate also fails when the backend job fails. The gate is SonarCloud with JaCoCo and *Sonar way* on the new code of the pull request: at least 80% coverage, at most 3% duplication, A ratings, security hotspots reviewed. SonarCloud ignores coverage and duplication below 20 new lines. The job `Quality gate (SonarCloud)` fails when the gate fails; the SonarCloud check of the pull request says why. It covers the backend only. Pull requests from Dependabot or from forks get no SonarCloud token, so the job passes without an analysis and the reviewer looks closer.
-- A dependency check in CI on every build is also decided and not in place yet (HE-47).
+- GitHub also blocks the merge until these checks pass: `Backend (build and tests)`, `Simulator (build and tests)`, `Frontend (lint, tests and build)`, `Quality gate (SonarCloud)` and `Dependencies (vulnerability scan)`. The ruleset of `dev` and `main` requires them from the merge of HE-40 on (the dependency check from the merge of HE-47 on); until then, never merge with CI failing. The quality gate also fails when the backend job fails. The gate is SonarCloud with JaCoCo and *Sonar way* on the new code of the pull request: at least 80% coverage, at most 3% duplication, A ratings, security hotspots reviewed. SonarCloud ignores coverage and duplication below 20 new lines. The job `Quality gate (SonarCloud)` fails when the gate fails; the SonarCloud check of the pull request says why. It covers the backend only. Pull requests from Dependabot or from forks get no SonarCloud token, so the job passes without an analysis and the reviewer looks closer.
+- CI also checks the dependencies on every build (Trivy, HE-47): the job `Dependencies (vulnerability scan)` fails on a HIGH or CRITICAL vulnerability that already has a fixed version. See [When the dependency check fails](#when-the-dependency-check-fails).
 - GitHub does not check yet that a pull request to `main` comes from `dev`: check the base and the source branch before you approve or merge.
 - Choose **Create a merge commit**, also from `dev` to `main`. Squash would join the failing tests and the code in one commit, and the history would no longer show that the tests came first.
 - GitHub deletes the story branch after the merge. The rules of the repository do not allow deleting `dev` or `main`.
+
+### When the dependency check fails
+
+The *Dependencies (vulnerability scan)* job fails when a dependency has a HIGH or CRITICAL vulnerability **that already has a fixed version**. Vulnerabilities with no fix yet are listed in the job log but do not fail it. A new vulnerability can be published at any time, so the job can fail on a pull request that did not touch any dependency.
+
+1. Read the job log: it names the package, the vulnerability and the fixed version.
+2. Update that dependency to the fixed version, in its own pull request, so that the other pull requests turn green again after it is merged. If Dependabot already opened a pull request for it, review and merge that one.
+3. Only if the fix exists only in a version the team cannot adopt yet (for example a new major), add the vulnerability to `.trivyignore` at the repository root, with the reason and an expiry date, and say so in the pull request:
+
+   ```
+   # Fixed only in Spring Boot 5; revisit when we move to it (HE-<n>)
+   CVE-YYYY-NNNNN exp:2026-12-31
+   ```
+
+   After the expiry date the entry no longer applies and the job fails again, so the exception is reviewed instead of forgotten.
+
+What the job covers: the Maven dependencies (compile and runtime scopes) of the backend and the simulator, and every npm dependency of the frontend, development dependencies included. It does not scan Maven test dependencies (Testcontainers, Cucumber and the libraries they bring): Dependabot opens pull requests to update them, but nothing checks them for known vulnerabilities: Dependabot alerts cannot match them, because the dependency graph of the repository lists the Maven dependencies without their resolved versions. Dependabot alerts and Dependabot security updates must stay on in the repository settings (Advanced Security).
+
+The base images of the Dockerfiles and of `docker-compose.yml` are not scanned. Most of their tags name only a major version (`postgres:18`, `node:22-alpine`, `eclipse-temurin:21-jre`), so Dependabot proposes no update for them, because new majors are ignored on purpose. Those tags still receive the patched builds of their major: rebuild with `docker compose build --pull` and `docker compose pull` to get them.
 
 ## Code style
 
@@ -134,7 +186,13 @@ Agents never merge. A human approves every pull request.
 - Unit tests for business logic, with the boundary values of each rule; integration tests (adapters, REST API, and Testcontainers with PostgreSQL 18 and Mosquitto) run separately from unit tests.
 - Acceptance criteria of core stories are Gherkin scenarios automated with Cucumber, tagged with the story (`@HE-29`) and the business rule they cover (for example `@BR1`).
 - Scenarios of stories not implemented yet are tagged `@wip` and left out of the build. When you implement a story, write its steps in `backend/src/test/java/pt/ua/hipereats/acceptance` and remove `@wip` from its feature file.
-- Tests are linked to their Jira story so that Xray reports coverage: the story tag in Gherkin, and `@Requirement` in JUnit once `xray-junit-extensions` is in `backend/pom.xml`.
+- Link every test of a story to it, so that Xray shows the story's coverage. The key must be an existing Story or Epic in Jira, the requirement types set up in Xray: a task or a mistyped key can make Xray refuse the import.
+  - **Gherkin:** the story tag on the feature (`@HE-29`) is enough; every scenario of the feature covers that story.
+  - **JUnit (backend):** annotate each test method with `@Requirement("HE-29")` (`app.getxray.xray.junit.customjunitxml.annotations.Requirement`); on the class it is ignored. A test of a business rule that serves several stories can name them all: `@Requirement({"HE-29", "HE-30"})`.
+
+  On every push to `dev`, CI imports the results of the tests linked to a story into Xray (job *Xray test results*) as a Test Execution of the current iteration's Test Plan, set in the repository variable `XRAY_TEST_PLAN_KEY`. Tests linked to no story (adapters, configuration) and scenarios tagged `@wip` are not imported. The listener of `xray-junit-extensions` writes the reports to `backend/target/xray/`.
+
+  Xray creates a Test the first time it sees one and links it to its story; it recognises it later by its name (class and method in JUnit, feature and scenario in Gherkin). So keep scenario names unique within a feature, and when you rename a linked test, scenario, test class or feature, delete the old Test in Xray: otherwise it stays linked to the story with its last result. The rows of a Scenario Outline are named by their position (`Example #1.2`), so adding or reordering rows renames them too. The runs of a parameterized JUnit test share one name, so Xray does not tell them apart: name the case in the assertion message so a failure says which one.
 - Never weaken, skip or delete a test to make a build pass.
 
 ## AI use
@@ -145,6 +203,23 @@ AI tools are welcome; the responsibility stays with the person who opens the pul
 - The same rules apply to all code, including the tests and the review.
 - Give agents [AGENTS.md](AGENTS.md) before they change anything.
 - In the **AI use** section of the pull request, say what was produced with AI, and which Claude review findings you accepted or rejected and why.
+
+## Definition of ready
+
+A story is ready, and may enter a sprint at sprint planning, when:
+
+- it follows the [story format](#stories) and has a few acceptance criteria that bound it;
+- if it applies business rules, they are referenced by their ID (`BR<n>`) and section 3.2 of the Product Specification gives the values it needs; if a value is missing, ask the Product Owner;
+- if it is a core story, its Gherkin scenarios are written and reviewed, tagged with the story (`@HE-<n>`) and the rules (`@BR<n>`): either already in `backend/src/test/resources/features`, still `@wip`, or in the Jira story, to become the first commit of its pull request, tagged `@wip`;
+- its dependencies on other stories are identified and linked in Jira ("is blocked by"), and none of them blocks it now, or the team agreed a workaround, noted in the Jira story and repeated in the pull request;
+- the Product Owner and the team have reviewed it at grooming or sprint planning;
+- it has story points on the Fibonacci scale, agreed by the team.
+
+Core stories are the user stories of the mandatory MVP. Tasks and the extensions (geofencing and predictive maintenance) are not core stories **(proposal)**.
+
+A task (for example of the *Platform and quality* epic) is ready when it has a clear goal, acceptance criteria and its dependencies identified.
+
+If a story or task you pick is not ready, do not start it: ask the Product Owner, and complete it or pick another one.
 
 ## Definition of done
 

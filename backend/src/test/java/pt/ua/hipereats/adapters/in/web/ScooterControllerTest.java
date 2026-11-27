@@ -6,6 +6,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
+import app.getxray.xray.junit.customjunitxml.annotations.Requirement;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -62,6 +63,7 @@ class ScooterControllerTest {
     }
 
     @Test
+    @Requirement("HE-29")
     void whenScooterIsRegistered_thenCreatedWithItsLocation() {
         given(registerScooter.register(any())).willReturn(
                 new Scooter("AV-08", ScooterType.LONG_RANGE, ScooterState.INACTIVE, 1L));
@@ -80,6 +82,7 @@ class ScooterControllerTest {
     }
 
     @Test
+    @Requirement("HE-29")
     @DisplayName("BR13: registration at a store at capacity is refused naming the rule")
     void whenStoreIsAtCapacity_thenUnprocessableNamingBR13() {
         given(registerScooter.register(any())).willThrow(new StoreAtCapacityException(1L, 10));
@@ -92,6 +95,7 @@ class ScooterControllerTest {
     }
 
     @Test
+    @Requirement("HE-29")
     void whenStoreDoesNotExist_thenNotFound() {
         given(registerScooter.register(any())).willThrow(new StoreNotFoundException(1L));
 
@@ -100,6 +104,7 @@ class ScooterControllerTest {
     }
 
     @Test
+    @Requirement("HE-29")
     void whenCodeIsAlreadyUsed_thenConflict() {
         given(registerScooter.register(any()))
                 .willThrow(new ScooterCodeAlreadyUsedException("AV-01"));
@@ -109,6 +114,7 @@ class ScooterControllerTest {
     }
 
     @Test
+    @Requirement("HE-29")
     void whenCodeIsMissing_thenBadRequest() {
         assertBadRequest(post("""
                 {"type": "STANDARD", "storeId": 1}
@@ -116,6 +122,7 @@ class ScooterControllerTest {
     }
 
     @Test
+    @Requirement("HE-29")
     void whenCodeIsBlank_thenBadRequest() {
         assertBadRequest(post("""
                 {"code": " ", "type": "STANDARD", "storeId": 1}
@@ -127,6 +134,7 @@ class ScooterControllerTest {
      * digits and hyphens, 1 to 32 characters (assumption of HE-29: the specification sets no format).
      */
     @ParameterizedTest
+    @Requirement("HE-29")
     @ValueSource(strings = {"AV/01", "AV 01", "AV#1", "AV-01 ", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-01"})
     void whenCodeHasAnInvalidFormat_thenBadRequest(String code) {
         assertBadRequest(post("""
@@ -135,6 +143,7 @@ class ScooterControllerTest {
     }
 
     @Test
+    @Requirement("HE-29")
     void whenCodeHasTheMaximumLength_thenItIsAccepted() {
         String code = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAA-01";
         given(registerScooter.register(any())).willReturn(
@@ -148,6 +157,7 @@ class ScooterControllerTest {
     }
 
     @Test
+    @Requirement("HE-29")
     void whenTypeIsMissing_thenBadRequest() {
         assertBadRequest(post("""
                 {"code": "AV-01", "storeId": 1}
@@ -155,6 +165,7 @@ class ScooterControllerTest {
     }
 
     @Test
+    @Requirement("HE-29")
     void whenTypeIsUnknown_thenBadRequest() {
         assertBadRequest(post("""
                 {"code": "AV-01", "type": "BICYCLE", "storeId": 1}
@@ -162,6 +173,7 @@ class ScooterControllerTest {
     }
 
     @Test
+    @Requirement("HE-29")
     void whenStoreIsMissing_thenBadRequest() {
         assertBadRequest(post("""
                 {"code": "AV-01", "type": "STANDARD"}
@@ -169,6 +181,7 @@ class ScooterControllerTest {
     }
 
     @Test
+    @Requirement("HE-29")
     void whenScooterExists_thenItIsReturned() {
         given(scooterQuery.findByCode("AV-01")).willReturn(Optional.of(
                 new Scooter("AV-01", ScooterType.STANDARD, ScooterState.INACTIVE, 1L)));
@@ -181,6 +194,7 @@ class ScooterControllerTest {
     }
 
     @Test
+    @Requirement("HE-29")
     void whenScooterDoesNotExist_thenNotFound() {
         given(scooterQuery.findByCode("XX-99")).willReturn(Optional.empty());
 

@@ -3,6 +3,7 @@ package pt.ua.hipereats.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import app.getxray.xray.junit.customjunitxml.annotations.Requirement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -51,6 +52,7 @@ class FleetServiceTest {
     private final FleetService service = new FleetService(stores, scooters);
 
     @Test
+    @Requirement("HE-29")
     @DisplayName("BR13: a scooter registered at a store with a free place is stored inactive")
     void whenStoreHasAFreePlace_thenScooterIsStoredInactive() {
         stores.stores.put(1L, new Store(1L, 10, 9));
@@ -64,6 +66,7 @@ class FleetServiceTest {
     }
 
     @Test
+    @Requirement("HE-29")
     @DisplayName("BR13: nothing is stored when the store is at capacity")
     void whenStoreIsAtCapacity_thenNothingIsStored() {
         stores.stores.put(1L, new Store(1L, 10, 10));
@@ -76,6 +79,7 @@ class FleetServiceTest {
     }
 
     @Test
+    @Requirement("HE-29")
     void whenStoreDoesNotExist_thenRegistrationIsRefused() {
         RegisterScooterCommand command =
                 new RegisterScooterCommand("AV-01", ScooterType.STANDARD, 99L);
@@ -86,6 +90,7 @@ class FleetServiceTest {
     }
 
     @Test
+    @Requirement("HE-29")
     void whenScooterWasRegistered_thenItIsFoundByItsCode() {
         stores.stores.put(1L, new Store(1L, 10, 0));
         service.register(new RegisterScooterCommand("AV-01", ScooterType.STANDARD, 1L));

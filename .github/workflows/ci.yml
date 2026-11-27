@@ -35,9 +35,11 @@ jobs:
           cache: maven
           cache-dependency-path: backend/pom.xml
 
-      # Unit tests (*Test, Surefire), integration tests (*IT, Failsafe) and packaging.
+      # Unit tests (*Test, Surefire), integration tests (*IT, Failsafe) and packaging. A failing
+      # test does not stop Maven here, so that every test runs and every report exists (Xray gets
+      # all the results, HE-41); the step "Fail when a test failed" fails the job afterwards.
       - name: Build and test
-        run: ./mvnw -B -ntp verify
+        run: ./mvnw -B -ntp verify -Dmaven.test.failure.ignore=true
 
       # Compiled classes, test results and coverage, so that SonarCloud does not build and test again.
       # Same condition as the quality-gate job: a manual run on another branch has no analysis to feed.
@@ -64,7 +66,23 @@ jobs:
             backend/target/surefire-reports/
             backend/target/failsafe-reports/
             backend/target/cucumber/
+            backend/target/xray/
           if-no-files-found: ignore
+
+      # Fails the job, and so this required check, when a unit, integration or acceptance test
+      # failed: "Build and test" lets Maven go on after a failing test.
+      - name: Fail when a test failed
+        run: |
+          failed=$(grep -lE '<testsuite [^>]*(failures|errors)="[1-9]' \
+            target/surefire-reports/TEST-*.xml target/failsafe-reports/TEST-*.xml || true)
+          if [ -n "$failed" ]; then
+            echo "::error::Tests failed in: $(xargs -n1 basename <<< "$failed" | tr '\n' ' ')"
+            exit 1
+          fi
+          if ! ls target/surefire-reports/TEST-*.xml target/failsafe-reports/TEST-*.xml > /dev/null; then
+            echo "::error::Test reports are missing"
+            exit 1
+          fi
 
   simulator:
     name: Simulator (build and tests)
@@ -185,6 +203,9 @@ jobs:
 
       # In a pull request, waits for the quality gate (up to 5 minutes) and fails when it fails.
       # Not on dev and main: the gate of a branch is not computed in its first analysis.
+      # The plugin is named by groupId:artifactId (version from pluginManagement in pom.xml), not by
+      # the prefix "sonar:": resolving a prefix downloads the plugin-group metadata from Maven
+      # Central, which answers HTTP 429 under load and fails with "No plugin found for prefix".
       - name: SonarCloud analysis and quality gate
         if: env.HAS_SECRETS == 'true'
         working-directory: backend
@@ -192,4 +213,171 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           : "${SONAR_TOKEN:?The SONAR_TOKEN secret is missing}"
-          ./mvnw -B -ntp sonar:sonar -Dsonar.qualitygate.wait=${{ github.event_name == 'pull_request' }}
+          ./mvnw -B -ntp org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+            -Dsonar.qualitygate.wait=${{ github.event_name == 'pull_request' }}
+
+  dependencies:
+    name: Dependencies (vulnerability scan)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Practice Q3: dependency vulnerability scanning on every build. Trivy scans the Maven
+    # dependencies of the backend and the simulator, and the npm dependencies of the frontend.
+    # - npm: development dependencies are included too (TRIVY_INCLUDE_DEV_DEPS, npm only).
+    # - Maven: Trivy covers the compile and runtime scopes only, not test, provided or optional
+    #   (Testcontainers, Cucumber...). Dependabot opens their update pull requests, but nothing
+    #   checks them for known vulnerabilities: the dependency graph of the repository has no
+    #   resolved Maven versions, so Dependabot alerts cannot match them either.
+    # - The base images of the Dockerfiles and of docker-compose.yml are not scanned at all.
+    # Trivy reads the Maven dependencies from the local repository only (TRIVY_OFFLINE_SCAN):
+    # without it, it downloads every POM from Maven Central, which rate-limits CI (HTTP 429) and
+    # would fail the job without any vulnerability.
+    env:
+      TRIVY_INCLUDE_DEV_DEPS: "true"
+      TRIVY_OFFLINE_SCAN: "true"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: |
+            backend/pom.xml
+            simulator/pom.xml
+
+      # Puts the dependencies of both Maven projects in ~/.m2 (cached), where Trivy reads them.
+      # setup-java restores the cache only when both pom.xml are unchanged, so after a change to
+      # either one everything is downloaded from Maven Central, which can answer HTTP 429. Each
+      # project gets up to three attempts, 30 seconds apart. If this step still fails, it is the
+      # rate limit, not a vulnerability: re-run the job.
+      - name: Resolve Maven dependencies
+        run: |
+          resolve() {
+            for attempt in 1 2 3; do
+              ./mvnw -B -ntp -q dependency:resolve && return 0
+              if [ "$attempt" -lt 3 ]; then
+                echo "::warning::Resolving the dependencies of $1 failed (attempt $attempt of 3), retrying in 30 seconds"
+                sleep 30
+              fi
+            done
+            echo "::error::Could not resolve the dependencies of $1; if the log shows HTTP 429, re-run the job"
+            return 1
+          }
+          (cd backend && resolve backend)
+          (cd simulator && resolve simulator)
+
+      # The action is pinned to a full commit SHA, not a tag: in March 2026 most trivy-action tags
+      # were rewritten to point to malware (GHSA-69fq-xp46-6x23). v0.36.0 is an immutable release
+      # published after the incident. Dependabot updates the SHA; the Trivy version below is
+      # updated by hand.
+      - name: List HIGH and CRITICAL vulnerabilities (report only)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.76.2
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          skip-dirs: .cache
+          exit-code: "0"
+
+      # Fails the build only when a HIGH or CRITICAL vulnerability already has a fixed version:
+      # then updating the dependency fixes it. Vulnerabilities with no fix yet stay in the report
+      # above without blocking every merge. Reuses the Trivy, database and ~/.m2 of the steps
+      # above, so this second scan is local; cache is off here so that restoring the database
+      # cache again does not replace the one the first step just updated. (trivy convert cannot
+      # apply --ignore-unfixed to a saved report, hence two scans.)
+      - name: Fail on fixable HIGH and CRITICAL vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          skip-setup-trivy: true
+          cache: "false"
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          skip-dirs: .cache
+          ignore-unfixed: true
+          exit-code: "1"
+
+  # Xray traceability (HE-41): the backend tests linked to a story (@Requirement, or the @HE-n tag
+  # of a Gherkin feature) become one Test Execution in Xray, in the Test Plan of the current
+  # iteration. Tests that do not exist in Xray yet are created and linked to their story; tests
+  # linked to no story stay in the CI reports only.
+  # Only on dev, on every push and when started by hand (Run workflow): what is merged is what
+  # counts, and pull requests from Dependabot or forks get no secrets. Runs also when tests failed,
+  # so that Xray shows the failures. When the backend failed before its tests (a compile error), it
+  # uploaded no reports: this job imports nothing and leaves the failure to the backend job.
+  xray:
+    name: Xray test results
+    needs: backend
+    if: ${{ !cancelled() && github.ref == 'refs/heads/dev' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts
+
+      - name: Download the test reports
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: backend-test-reports
+          path: reports
+
+      - name: Keep the tests linked to a story
+        id: report
+        if: steps.download.outcome == 'success'
+        # On its own line, so that a failing script fails the step.
+        run: |
+          count=$(python3 .github/scripts/xray-report.py reports/xray xray-report.xml)
+          echo "tests=$count" >> "$GITHUB_OUTPUT"
+
+      # XRAY_TEST_PLAN_KEY is a repository variable (Settings, Secrets and variables, Actions,
+      # Variables): the Test Plan of the current iteration, changed once per iteration.
+      # The Test Execution records the commit it tested (revision).
+      - name: Import the results into Xray
+        if: steps.report.outputs.tests != '' && steps.report.outputs.tests != '0'
+        env:
+          XRAY_CLIENT_ID: ${{ secrets.XRAY_CLIENT_ID }}
+          XRAY_CLIENT_SECRET: ${{ secrets.XRAY_CLIENT_SECRET }}
+          TEST_PLAN_KEY: ${{ vars.XRAY_TEST_PLAN_KEY }}
+          TESTS: ${{ steps.report.outputs.tests }}
+          XRAY_API: https://xray.cloud.getxray.app/api/v2
+        run: |
+          set -o pipefail
+          : "${XRAY_CLIENT_ID:?The XRAY_CLIENT_ID secret is missing}"
+          : "${XRAY_CLIENT_SECRET:?The XRAY_CLIENT_SECRET secret is missing}"
+          : "${TEST_PLAN_KEY:?The XRAY_TEST_PLAN_KEY variable is missing}"
+
+          if ! token=$(jq -n --arg id "$XRAY_CLIENT_ID" --arg secret "$XRAY_CLIENT_SECRET" \
+              '{client_id: $id, client_secret: $secret}' \
+            | curl -sS --fail-with-body -H "Content-Type: application/json" --data @- \
+              "$XRAY_API/authenticate"); then
+            echo "::error::Xray authentication failed: $token"
+            exit 1
+          fi
+          token=$(tr -d '"' <<< "$token")
+          echo "::add-mask::$token"
+
+          if ! response=$(curl -sS --fail-with-body -H "Authorization: Bearer $token" \
+              -H "Content-Type: text/xml" --data-binary @xray-report.xml \
+              "$XRAY_API/import/execution/junit?projectKey=HE&testPlanKey=$TEST_PLAN_KEY&revision=$GITHUB_SHA"); then
+            echo "::error::Xray refused the report: $response"
+            exit 1
+          fi
+          execution=$(jq -r '.key' <<< "$response")
+          echo "Test Execution $execution in Test Plan $TEST_PLAN_KEY: $TESTS tests (commit $GITHUB_SHA)" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Explain the skipped import
+        if: steps.report.outputs.tests == '0'
+        run: echo "::notice::No test is linked to a story yet, so nothing was imported into Xray."
+
+      - name: Explain the missing reports
+        if: steps.download.outcome != 'success'
+        run: echo "::notice::No test reports from the backend job (most likely it failed before its tests ran), so nothing was imported into Xray."
