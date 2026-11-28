@@ -32,7 +32,7 @@ class JwtTokenIssuerTest {
 
     @Test
     void whenTokenIsIssued_thenItNamesTheAccountAndItsRole() {
-        UserAccount rita = new UserAccount(7L, "rita@example.test", "{noop}x", Role.COURIER);
+        UserAccount rita = new UserAccount(7L, "rita@example.test", "{noop}x", Role.COURIER, true);
 
         Jwt jwt = decode(issuer.issue(rita).value());
 
@@ -43,7 +43,7 @@ class JwtTokenIssuerTest {
 
     @Test
     void whenTokenIsIssued_thenItExpiresAfterTheConfiguredValidity() {
-        UserAccount rita = new UserAccount(7L, "rita@example.test", "{noop}x", Role.COURIER);
+        UserAccount rita = new UserAccount(7L, "rita@example.test", "{noop}x", Role.COURIER, true);
 
         IssuedToken token = issuer.issue(rita);
 

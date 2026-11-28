@@ -22,6 +22,11 @@ public class JpaUserAccountRepository implements UserAccountRepository {
     }
 
     @Override
+    public Optional<UserAccount> findById(long id) {
+        return jpa.findById(id).map(UserAccountEntity::toDomain);
+    }
+
+    @Override
     public UserAccount save(UserAccount account) {
         // saveAndFlush: a repeated email fails here, not later at the end of the transaction.
         return jpa.saveAndFlush(UserAccountEntity.from(account)).toDomain();

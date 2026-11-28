@@ -5,6 +5,8 @@ import io.cucumber.java.ParameterType;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -31,6 +33,10 @@ public class AccountSteps {
 
     private ResponseSpec response;
     private String accessToken;
+    /** The token of the admin of the scenario, kept when another role logs in after it. */
+    private String adminToken;
+    /** Tokens of the named users who logged in during the scenario. */
+    private final Map<String, String> tokensByEmail = new HashMap<>();
 
     public AccountSteps(RestTestClient client, UserAccountRepository accounts, PasswordHasher passwordHasher,
                         JdbcClient jdbc) {
@@ -72,11 +78,74 @@ public class AccountSteps {
     public void aUserLoggedInWithTheRole(Role role) {
         String email = role.name().toLowerCase(Locale.ROOT) + "-" + UUID.randomUUID() + "@example.test";
         createAccount(email, "Secret-123", role);
-        accessToken = logIn(email, "Secret-123")
+        accessToken = tokenOf(email, "Secret-123");
+        if (role == Role.ADMIN) {
+            adminToken = accessToken;
+        }
+    }
+
+    private String tokenOf(String email, String password) {
+        return logIn(email, password)
                 .expectStatus().isOk()
                 .returnResult(SessionBody.class)
                 .getResponseBody()
                 .accessToken();
+    }
+
+    /** The id of an account, as the admin sees it in the list of accounts. */
+    private long idOf(String email) {
+        UserBody[] users = client.get().uri("/api/v1/users")
+                .header("Authorization", "Bearer " + adminToken)
+                .exchange()
+                .expectStatus().isOk()
+                .returnResult(UserBody[].class)
+                .getResponseBody();
+        return Arrays.stream(users).filter(u -> u.email().equals(email)).findFirst()
+                .orElseThrow(() -> new AssertionError("No account " + email))
+                .id();
+    }
+
+    private ResponseSpec deactivate(String email, String token) {
+        return client.patch().uri("/api/v1/users/{id}", idOf(email))
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("active", false))
+                .exchange();
+    }
+
+    @Given("{string} is logged in with password {string}")
+    public void isLoggedInWithPassword(String email, String password) {
+        tokensByEmail.put(email, tokenOf(email, password));
+    }
+
+    @When("the admin deactivates the account {string}")
+    public void theAdminDeactivatesTheAccount(String email) {
+        deactivate(email, adminToken).expectStatus().isOk()
+                .expectBody().jsonPath("$.active").isEqualTo(false);
+    }
+
+    @When("the user tries to deactivate the account {string}")
+    public void theUserTriesToDeactivateTheAccount(String email) {
+        response = deactivate(email, accessToken);
+    }
+
+    @Then("{string} cannot log in with password {string}")
+    public void cannotLogInWithPassword(String email, String password) {
+        logIn(email, password).expectStatus().isUnauthorized()
+                .expectBody().jsonPath("$.accessToken").doesNotExist();
+    }
+
+    @Then("{string} can still log in with password {string}")
+    public void canStillLogInWithPassword(String email, String password) {
+        logIn(email, password).expectStatus().isOk();
+    }
+
+    @Then("the access token of {string} is no longer accepted")
+    public void theAccessTokenIsNoLongerAccepted(String email) {
+        client.get().uri("/api/v1/users")
+                .header("Authorization", "Bearer " + tokensByEmail.get(email))
+                .exchange()
+                .expectStatus().isUnauthorized();
     }
 
     /** The token of the user who logged in last in the scenario, for the steps of other features. */
@@ -142,5 +211,9 @@ public class AccountSteps {
 
     /** The part of the login response the steps need. */
     record SessionBody(String accessToken) {
+    }
+
+    /** The part of an account in the list that the steps need. */
+    record UserBody(long id, String email) {
     }
 }

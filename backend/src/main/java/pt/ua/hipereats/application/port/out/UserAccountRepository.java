@@ -10,7 +10,9 @@ public interface UserAccountRepository {
     /** @param email already normalized ({@link UserAccount#normalizeEmail}) */
     Optional<UserAccount> findByEmail(String email);
 
-    /** Saves the account and returns it with its id. */
+    Optional<UserAccount> findById(long id);
+
+    /** Saves a new account, or the changes of an existing one (same id), and returns it with its id. */
     UserAccount save(UserAccount account);
 
     /** Every account, ordered by email. */

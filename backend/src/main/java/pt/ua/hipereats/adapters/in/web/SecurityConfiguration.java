@@ -1,6 +1,8 @@
 package pt.ua.hipereats.adapters.in.web;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,7 +13,12 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
@@ -84,9 +91,18 @@ public class SecurityConfiguration {
         return JwtKeys.encoder(properties);
     }
 
+    /**
+     * Checks the signature and the expiry of each token, plus every other token validator bean,
+     * such as {@link ActiveAccountTokenValidator} (none in a web slice test).
+     */
     @Bean
-    JwtDecoder jwtDecoder(SecurityProperties properties) {
-        return JwtKeys.decoder(properties);
+    JwtDecoder jwtDecoder(SecurityProperties properties, List<OAuth2TokenValidator<Jwt>> extraValidators) {
+        NimbusJwtDecoder decoder = JwtKeys.decoder(properties);
+        List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
+        validators.add(JwtValidators.createDefault());
+        validators.addAll(extraValidators);
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(validators));
+        return decoder;
     }
 
     private static void writeProblem(HttpServletResponse response, JsonMapper json, HttpStatus status, String detail)

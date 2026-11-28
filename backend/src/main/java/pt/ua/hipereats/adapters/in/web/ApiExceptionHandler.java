@@ -5,6 +5,9 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import pt.ua.hipereats.application.AccountDeactivatedException;
+import pt.ua.hipereats.application.AccountNotFoundException;
+import pt.ua.hipereats.application.CannotDeactivateOwnAccountException;
 import pt.ua.hipereats.application.InvalidCredentialsException;
 import pt.ua.hipereats.domain.fleet.ScooterCodeAlreadyUsedException;
 import pt.ua.hipereats.domain.fleet.StoreAtCapacityException;
@@ -21,6 +24,21 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(InvalidCredentialsException.class)
     ProblemDetail invalidCredentials(InvalidCredentialsException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, exception.getMessage());
+    }
+
+    @ExceptionHandler(AccountDeactivatedException.class)
+    ProblemDetail accountDeactivated(AccountDeactivatedException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, exception.getMessage());
+    }
+
+    @ExceptionHandler(AccountNotFoundException.class)
+    ProblemDetail accountNotFound(AccountNotFoundException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+    }
+
+    @ExceptionHandler(CannotDeactivateOwnAccountException.class)
+    ProblemDetail cannotDeactivateOwnAccount(CannotDeactivateOwnAccountException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
     }
 
     @ExceptionHandler(StoreAtCapacityException.class)
