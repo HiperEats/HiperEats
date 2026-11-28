@@ -40,19 +40,13 @@ public class AccountService
         if (password == null) {
             throw new InvalidCredentialsException();
         }
-<<<<<<< HEAD
-        UserAccount account = accounts.findByEmail(UserAccount.normalizeEmail(email))
-                .filter(found -> passwordHasher.matches(password, found.passwordHash()))
-                .orElseThrow(InvalidCredentialsException::new);
-        if (!account.active()) {
-            throw new AccountDeactivatedException();
-        }
-=======
         Optional<UserAccount> found = accounts.findByEmail(UserAccount.normalizeEmail(email));
         String hash = found.map(UserAccount::passwordHash).orElse(dummyHash);
         boolean passwordMatches = passwordHasher.matches(password, hash);
         UserAccount account = found.filter(a -> passwordMatches).orElseThrow(InvalidCredentialsException::new);
->>>>>>> origin/dev
+        if (!account.active()) {
+            throw new AccountDeactivatedException();
+        }
         IssuedToken token = tokenIssuer.issue(account);
         return new Session(token.value(), token.expiresAt(), account.email(), account.role());
     }
