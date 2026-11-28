@@ -52,8 +52,10 @@ class AccountServiceTest {
         }
     }
 
-    /** Fake hasher: the "hash" of a password is the password with a prefix. */
+    /** Fake hasher: the "hash" of a password is the password with a prefix. Counts the checks. */
     private static class FakeHasher implements PasswordHasher {
+        private int checks;
+
         @Override
         public String hash(String rawPassword) {
             return "hashed:" + rawPassword;
@@ -61,6 +63,7 @@ class AccountServiceTest {
 
         @Override
         public boolean matches(String rawPassword, String hash) {
+            checks++;
             return hash.equals("hashed:" + rawPassword);
         }
     }
@@ -74,7 +77,8 @@ class AccountServiceTest {
     }
 
     private final FakeAccounts accounts = new FakeAccounts();
-    private final AccountService service = new AccountService(accounts, new FakeHasher(), new FakeTokens());
+    private final FakeHasher hasher = new FakeHasher();
+    private final AccountService service = new AccountService(accounts, hasher, new FakeTokens());
 
     private UserAccount givenAccount(String email, String password, Role role) {
         return accounts.save(UserAccount.newAccount(email, "hashed:" + password, role));
@@ -105,6 +109,15 @@ class AccountServiceTest {
         assertThatThrownBy(() -> service.logIn("nobody@example.test", "Secret-123"))
                 .isInstanceOf(InvalidCredentialsException.class)
                 .hasMessage(new InvalidCredentialsException().getMessage());
+    }
+
+    /** Checking a password is slow on purpose (bcrypt): skipping it would tell by the time which emails exist. */
+    @Test
+    void whenEmailIsUnknown_thenAPasswordIsStillChecked() {
+        assertThatThrownBy(() -> service.logIn("nobody@example.test", "Secret-123"))
+                .isInstanceOf(InvalidCredentialsException.class);
+
+        assertThat(hasher.checks).isEqualTo(1);
     }
 
     @Test
